@@ -1,9 +1,10 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { login } from "./actions";
 
 export default function LoginPage() {
   const [error, action, pending] = useActionState(login, null);
+  const [show, setShow] = useState(false);
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
       <form action={action} className="card w-full max-w-sm space-y-4 p-6">
@@ -17,7 +18,17 @@ export default function LoginPage() {
         </label>
         <label className="block">
           <span className="label">密碼</span>
-          <input name="password" type="password" className="input" autoComplete="current-password" required />
+          <div className="relative">
+            <input name="password" type={show ? "text" : "password"} className="input pr-14" autoComplete="current-password" required />
+            <button
+              type="button"
+              onClick={() => setShow(!show)}
+              className="absolute inset-y-0 right-0 px-3 text-xs text-slate-500 hover:text-slate-800"
+              aria-label={show ? "隱藏密碼" : "顯示密碼"}
+            >
+              {show ? "隱藏" : "顯示"}
+            </button>
+          </div>
         </label>
         {error && <p className="text-sm text-rose-600">{error}</p>}
         <button className="btn w-full" disabled={pending}>
