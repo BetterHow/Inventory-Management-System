@@ -12,7 +12,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:demo": "tsx prisma/demo.ts",
-    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && next build"
+    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && ([ \"$LOAD_DEMO_DATA\" = \"true\" ] && tsx prisma/demo.ts || true) && next build"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

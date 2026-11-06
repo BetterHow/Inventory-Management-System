@@ -48,5 +48,6 @@ npm run dev                   # http://localhost:3000
 3. 匯入這個 GitHub repo，另外設定環境變數：
    - `AUTH_SECRET`：一串長亂碼（例如 `openssl rand -base64 32` 的結果）
    - `SEED_ADMIN_PASSWORD`：第一個管理員 `admin` 的密碼（至少 8 字元）
+   - `LOAD_DEMO_DATA=true`：只在試用時設定，會載入範例品項與耗用紀錄。正式環境不要設
 4. 部署。每次部署會自動執行 `vercel-build`：建立／更新資料表，第一次部署時建立 admin 帳號與預設庫別、類別。
 5. 用 `admin` 登入，到「系統設定」改診所名稱，到「使用者」建立人員帳號。

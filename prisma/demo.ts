@@ -1,5 +1,6 @@
 // Fills the database with sample data for trying the system out.
-// Run `npm run db:seed` first, then `npm run db:demo`. Do not run on real data.
+// Run `npm run db:seed` first, then `npm run db:demo`. Skipped when items already exist.
+// On Vercel, set LOAD_DEMO_DATA=true for a trial deploy. Never set it for the real clinic.
 import { PrismaClient } from "@prisma/client";
 import { addStock, removeStock } from "../src/lib/stock";
 
@@ -18,6 +19,10 @@ const ITEMS = [
 ];
 
 async function main() {
+  if ((await prisma.item.count()) > 0) {
+    console.log("Items already exist, demo data skipped.");
+    return;
+  }
   const admin = await prisma.user.findUniqueOrThrow({ where: { username: "admin" } });
   await prisma.warehouse.upsert({ where: { code: "OP" }, update: {}, create: { code: "OP", name: "眼鏡部", sortOrder: 3 } });
   const wh = new Map((await prisma.warehouse.findMany()).map((w) => [w.code, w.id]));
