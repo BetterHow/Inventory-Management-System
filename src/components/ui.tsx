@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { SAFETY_LABEL, type SafetyStatus, type ExpiryStatus } from "@/lib/logic";
 
-export function PageHeader({ title, children }: { title: string; children?: React.ReactNode }) {
+export function PageHeader({ title, description, children }: { title: string; description?: React.ReactNode; children?: React.ReactNode }) {
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-      <h1 className="text-xl font-semibold text-slate-800">{title}</h1>
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
+        {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+      </div>
       <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   );
@@ -24,12 +27,12 @@ export function LinkButton({ href, children, secondary }: { href: string; childr
 }
 
 const SAFETY_COLOR: Record<SafetyStatus, string> = {
-  NEGATIVE: "bg-rose-700 text-white",
-  LT1: "bg-rose-100 text-rose-700",
-  LT2: "bg-amber-100 text-amber-800",
-  LT3: "bg-sky-100 text-sky-800",
-  OK: "bg-emerald-100 text-emerald-800",
-  NONE: "bg-slate-100 text-slate-500",
+  NEGATIVE: "bg-rose-600 text-white",
+  LT1: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200",
+  LT2: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
+  LT3: "bg-sky-50 text-sky-800 ring-1 ring-inset ring-sky-200",
+  OK: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
+  NONE: "bg-slate-50 text-slate-500 ring-1 ring-inset ring-slate-200",
 };
 
 export function SafetyBadge({ status }: { status: SafetyStatus }) {
@@ -37,9 +40,9 @@ export function SafetyBadge({ status }: { status: SafetyStatus }) {
 }
 
 const EXPIRY: Record<ExpiryStatus, [string, string]> = {
-  EXPIRED: ["已過期", "bg-rose-700 text-white"],
-  DANGER: ["即將到期", "bg-rose-100 text-rose-700"],
-  WARN: ["注意效期", "bg-amber-100 text-amber-800"],
+  EXPIRED: ["已過期", "bg-rose-600 text-white"],
+  DANGER: ["即將到期", "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200"],
+  WARN: ["注意效期", "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200"],
   OK: ["", ""],
   NONE: ["", ""],
 };
@@ -51,7 +54,7 @@ export function ExpiryBadge({ status }: { status: ExpiryStatus }) {
 }
 
 export function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="py-10 text-center text-sm text-slate-400">{children}</div>;
+  return <div className="py-12 text-center text-sm text-slate-400">{children}</div>;
 }
 
 export function Notice({ kind = "info", children }: { kind?: "info" | "warn" | "ok"; children: React.ReactNode }) {
@@ -60,7 +63,7 @@ export function Notice({ kind = "info", children }: { kind?: "info" | "warn" | "
     warn: "border-amber-300 bg-amber-50 text-amber-900",
     ok: "border-emerald-200 bg-emerald-50 text-emerald-800",
   }[kind];
-  return <div className={`mb-4 rounded-md border px-3 py-2 text-sm ${color}`}>{children}</div>;
+  return <div className={`mb-4 rounded-lg border px-4 py-2.5 text-sm ${color}`}>{children}</div>;
 }
 
 /** Builds a link to the same page with some search params changed (empty value = removed). */
@@ -77,7 +80,7 @@ export function Pills({ items }: { items: { href: string; label: string; active:
     <div className="flex flex-wrap gap-1">
       {items.map((it) => (
         <Link key={it.href + it.label} href={it.href}
-          className={`rounded-full px-3 py-1 text-sm ${it.active ? "bg-teal-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
+          className={`rounded-full border px-3.5 py-1 text-sm transition-colors ${it.active ? "border-teal-600 bg-teal-600 font-medium text-white shadow-sm shadow-teal-900/10" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"}`}>
           {it.label}
         </Link>
       ))}
