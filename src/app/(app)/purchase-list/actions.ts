@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { attempt } from "@/lib/action";
+import { attempt, done } from "@/lib/action";
 import { UserError, intVal, numVal, optInt, optStr, str, withParam } from "@/lib/form";
 import { nextNumber } from "@/lib/stock";
 import { dateOnly, num } from "@/lib/format";
@@ -32,7 +32,7 @@ export async function addEntry(fd: FormData) {
     });
   });
   revalidatePath("/purchase-list");
-  redirect(withParam(back, "ok", "已加入待採購清單"));
+  return done(back, "已加入待採購清單");
 }
 
 export async function bulkAction(fd: FormData) {
@@ -82,12 +82,12 @@ export async function bulkAction(fd: FormData) {
     msg = `已轉成 ${groups.size} 張待入庫進貨單`;
   });
   revalidatePath("/purchase-list");
-  redirect("/purchase-list?ok=" + encodeURIComponent(msg));
+  return done("/purchase-list", msg);
 }
 
 export async function deleteEntry(id: number) {
   await requireUser();
   await prisma.purchaseListEntry.deleteMany({ where: { id, status: "PENDING" } });
   revalidatePath("/purchase-list");
-  redirect("/purchase-list?ok=" + encodeURIComponent("已刪除"));
+  return done("/purchase-list", "已刪除");
 }

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { attempt } from "@/lib/action";
+import { attempt, done } from "@/lib/action";
 import { UserError, bool, str } from "@/lib/form";
 import { PageHeader } from "@/components/ui";
 import { Flash } from "@/components/Flash";
@@ -25,7 +25,7 @@ async function addUser(fd: FormData) {
     });
   });
   revalidatePath("/users");
-  redirect("/users?ok=" + encodeURIComponent("已新增使用者"));
+  return done("/users", "已新增使用者");
 }
 
 async function saveUser(id: number, fd: FormData) {
@@ -49,7 +49,7 @@ async function saveUser(id: number, fd: FormData) {
     });
   });
   revalidatePath("/users");
-  redirect("/users?ok=" + encodeURIComponent("已儲存"));
+  return done("/users", "已儲存");
 }
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {

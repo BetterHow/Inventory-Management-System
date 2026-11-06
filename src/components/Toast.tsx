@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { FLASH_COOKIE } from "@/lib/flash";
 
 /**
  * A small "saved" message that floats at the top and fades out, so the page doesn't jump.
@@ -9,6 +10,7 @@ export function Toast({ message }: { message: string }) {
   const [shown, setShown] = useState(true);
   useEffect(() => {
     setShown(true);
+    document.cookie = `${FLASH_COOKIE}=; path=/; max-age=0`; // shown once
     const url = new URL(location.href);
     if (url.searchParams.has("ok")) {
       url.searchParams.delete("ok");

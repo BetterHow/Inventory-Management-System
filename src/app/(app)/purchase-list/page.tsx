@@ -3,17 +3,19 @@ import { prisma } from "@/lib/db";
 import { PageHeader, Empty, Field } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { fmtDateTime, fmtQty, num } from "@/lib/format";
-import { activeWarehouses } from "@/lib/pickers";
+import { activeWarehouses, pickItems } from "@/lib/pickers";
+import { ItemPicker } from "@/components/ItemPicker";
 import { addEntry, bulkAction, deleteEntry } from "./actions";
 
 export default async function PurchaseListPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const [entries, items, suppliers, warehouses, ordered] = await Promise.all([
+  const [entries, items, suppliers, warehouses, ordered, picks] = await Promise.all([
     prisma.purchaseListEntry.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } }),
     prisma.item.findMany({ where: { active: true }, orderBy: { code: "asc" } }),
     prisma.supplier.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     activeWarehouses(),
     prisma.receipt.findMany({ where: { status: "ORDERED" }, include: { supplier: true }, orderBy: { date: "desc" } }),
+    pickItems(),
   ]);
   const itemMap = new Map(items.map((i) => [i.id, i]));
   const whMap = new Map(warehouses.map((w) => [w.id, w.name]));
@@ -28,8 +30,7 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
 
       <form action={addEntry} className="card grid grid-cols-2 items-end gap-3 sm:grid-cols-6">
         <Field label="品項（掃碼或輸入）" className="col-span-2">
-          <input name="item" list="pl-items" className="input" required />
-          <datalist id="pl-items">{items.map((i) => <option key={i.id} value={`${i.code}｜${i.name}`} />)}</datalist>
+          <ItemPicker name="item" items={picks} required />
         </Field>
         <Field label="數量"><input name="qty" type="number" step="0.01" className="input" required /></Field>
         <Field label="庫別">
@@ -61,7 +62,7 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
                       <td>{suppliers.find((s) => s.id === e.supplierId)?.name ?? <span className="text-rose-600">未指定</span>}</td>
                       <td className="text-xs text-slate-500">{fmtDateTime(e.createdAt)}</td>
                       <td className="w-16 text-right">
-                        <button formAction={deleteEntry.bind(null, e.id)} formNoValidate className="text-sm text-slate-400 hover:text-rose-600">刪除</button>
+                        <button formAction={deleteEntry.bind(null, e.id)} formNoValidate className="btn-secondary px-2.5 py-1 text-xs text-rose-600 hover:border-rose-300 hover:bg-rose-50">刪除</button>
                       </td>
                     </tr>
                   );

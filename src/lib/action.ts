@@ -1,5 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { cookies, headers } from "next/headers";
+import { revalidatePath } from "next/cache";
+import { FLASH_COOKIE } from "./flash";
 import { Prisma } from "@prisma/client";
 import { UserError, withParam } from "./form";
 
@@ -17,4 +20,21 @@ export async function attempt<T>(backTo: string, fn: () => Promise<T>): Promise<
     }
     throw e;
   }
+}
+
+/**
+ * Finish a server action with a success message.
+ * Staying on the same page: refresh it in place (no redirect, so the screen doesn't blank out).
+ * Going to another page: redirect there. The message travels in a short-lived cookie and shows as a toast.
+ */
+export async function done(target: string, message: string): Promise<void> {
+  (await cookies()).set(FLASH_COOKIE, encodeURIComponent(message), { path: "/", maxAge: 60, sameSite: "lax" });
+  const referer = (await headers()).get("referer");
+  const from = referer ? new URL(referer).pathname : null;
+  const to = new URL(target, "http://local");
+  if (from === to.pathname) {
+    revalidatePath(to.pathname);
+    return;
+  }
+  redirect(target);
 }

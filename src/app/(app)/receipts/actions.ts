@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { attempt } from "@/lib/action";
+import { attempt, done } from "@/lib/action";
 import { UserError, intVal, json, optNum, optStr, str } from "@/lib/form";
 import { addStock, nextNumber } from "@/lib/stock";
 import { getSettings } from "@/lib/settings";
@@ -122,7 +122,7 @@ export async function saveReceipt(id: number | null, fd: FormData) {
   });
   revalidatePath("/receipts");
   revalidatePath("/");
-  redirect(`/receipts/${savedId}?ok=` + encodeURIComponent("已儲存"));
+  return done(`/receipts/${savedId}`, "已儲存");
 }
 
 export async function inspectReceipt(id: number) {
@@ -136,7 +136,7 @@ export async function inspectReceipt(id: number) {
     });
   });
   revalidatePath("/receipts");
-  redirect(`/receipts/${id}?ok=` + encodeURIComponent("已驗收入庫"));
+  return done(`/receipts/${id}`, "已驗收入庫");
 }
 
 export async function cancelReceipt(id: number) {
@@ -148,7 +148,7 @@ export async function cancelReceipt(id: number) {
     await prisma.purchaseListEntry.deleteMany({ where: { receiptId: id } });
   });
   revalidatePath("/receipts");
-  redirect(`/receipts/${id}?ok=` + encodeURIComponent("已取消"));
+  return done(`/receipts/${id}`, "已取消");
 }
 
 /** Attach this receipt to an existing invoice, or create a new one. */
@@ -175,7 +175,7 @@ export async function linkInvoice(id: number, fd: FormData) {
     await prisma.receipt.update({ where: { id }, data: { invoiceId: inv.id } });
   });
   revalidatePath(`/receipts/${id}`);
-  redirect(`/receipts/${id}?ok=` + encodeURIComponent("已設定發票"));
+  return done(`/receipts/${id}`, "已設定發票");
 }
 
 export async function unlinkInvoice(id: number) {

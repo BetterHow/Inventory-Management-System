@@ -1,3 +1,4 @@
+import { done } from "@/lib/action";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
@@ -18,7 +19,7 @@ async function save(fd: FormData) {
     consumptionNotes: splitLines(str(fd, "consumptionNotes")),
   });
   revalidatePath("/", "layout");
-  redirect("/settings?ok=" + encodeURIComponent("已儲存設定"));
+  return done("/settings", "已儲存設定");
 }
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {

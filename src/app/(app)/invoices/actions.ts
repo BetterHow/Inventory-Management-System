@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { attempt } from "@/lib/action";
+import { attempt, done } from "@/lib/action";
 import { UserError, bool, intVal, optNum, optStr, str } from "@/lib/form";
 import { dateOnly, num } from "@/lib/format";
 import { sum, todayTaipei } from "@/lib/logic";
@@ -32,7 +32,7 @@ export async function createInvoice(fd: FormData) {
     id = inv.id;
   });
   revalidatePath("/invoices");
-  redirect(`/invoices/${id}?ok=` + encodeURIComponent("已建立發票"));
+  return done(`/invoices/${id}`, "已建立發票");
 }
 
 export async function updateInvoice(id: number, fd: FormData) {
@@ -55,7 +55,7 @@ export async function updateInvoice(id: number, fd: FormData) {
     });
   });
   revalidatePath("/invoices");
-  redirect(`/invoices/${id}?ok=` + encodeURIComponent("已儲存"));
+  return done(`/invoices/${id}`, "已儲存");
 }
 
 export async function deleteInvoice(id: number) {
@@ -63,5 +63,5 @@ export async function deleteInvoice(id: number) {
   await prisma.receipt.updateMany({ where: { invoiceId: id }, data: { invoiceId: null } });
   await prisma.invoice.delete({ where: { id } });
   revalidatePath("/invoices");
-  redirect("/invoices?ok=" + encodeURIComponent("已刪除發票，相關進貨單改回未對發票"));
+  return done("/invoices", "已刪除發票，相關進貨單改回未對發票");
 }
