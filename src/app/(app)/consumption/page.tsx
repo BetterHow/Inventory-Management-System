@@ -29,7 +29,7 @@ export default async function ConsumptionPage({ searchParams }: { searchParams: 
                   <td className="num">{fmtQty(-num(m.qty))} {m.item.unit}</td>
                   <td className="num">{fmtMoney(-num(m.qty) * num(m.unitCost))}</td>
                   <td>{m.user?.name}</td>
-                  <td>{m.note}</td>
+                  <td className="wrap">{m.note}</td>
                 </tr>
               ))}
             </tbody>

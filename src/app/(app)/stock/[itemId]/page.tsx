@@ -39,16 +39,16 @@ export default async function ItemStockPage({ params, searchParams }: {
           <Link key={w.id} href={`/stock/${item.id}?warehouse=${w.id}`} className={`rounded-full px-3 py-1 ${wid === w.id ? "bg-teal-600 text-white" : "border border-slate-200 bg-white"}`}>{w.name}</Link>
         ))}
       </div>
-      <div className="grid gap-4 lg:grid-cols-5">
-        <div className="card overflow-x-auto p-0 lg:col-span-2">
+      <div className="space-y-4">
+        <div className="card overflow-x-auto p-0 lg:max-w-3xl">
           <h2 className="px-3 pt-3 font-semibold">批號庫存</h2>
           {batches.length === 0 ? <Empty>沒有庫存</Empty> : (
             <table className="table">
-              <thead><tr><th>庫別</th><th>批號</th><th>效期</th><th className="num">數量</th><th className="num">單位成本</th></tr></thead>
+              <thead><tr>{!wid && <th>庫別</th>}<th>批號</th><th>效期</th><th className="num">數量</th><th className="num">單位成本</th></tr></thead>
               <tbody>
                 {batches.map((b) => (
                   <tr key={b.id}>
-                    <td>{b.warehouse.name}</td>
+                    {!wid && <td>{b.warehouse.name}</td>}
                     <td>{b.lotNo || "—"}</td>
                     <td className="whitespace-nowrap">{fmtDate(b.expiryDate, true)} <ExpiryBadge status={expiryStatus(b.expiryDate, new Date(), settings.expiryWarnDays, settings.expiryDangerDays)} /></td>
                     <td className={`num ${num(b.qty) < 0 ? "text-rose-600" : ""}`}>{fmtQty(b.qty)}</td>
@@ -59,11 +59,11 @@ export default async function ItemStockPage({ params, searchParams }: {
             </table>
           )}
         </div>
-        <div className="card overflow-x-auto p-0 lg:col-span-3">
+        <div className="card overflow-x-auto p-0">
           <h2 className="px-3 pt-3 font-semibold">進出庫流水帳 <span className="text-xs font-normal text-slate-400">最近 300 筆</span></h2>
           {ledger.length === 0 ? <Empty>沒有紀錄</Empty> : (
             <table className="table">
-              <thead><tr><th>時間</th><th>類型</th><th>庫別</th><th>批號</th><th className="num">異動</th><th className="num">結存</th><th>人員</th><th>備註</th></tr></thead>
+              <thead><tr><th>時間</th><th>類型</th>{!wid && <th>庫別</th>}<th>批號</th><th className="num">異動</th><th className="num">結存</th><th>人員</th><th className="w-full">備註</th></tr></thead>
               <tbody>
                 {ledger.map(({ m, bal }) => {
                   const link = refLink(m.refType, m.refId);
@@ -72,12 +72,12 @@ export default async function ItemStockPage({ params, searchParams }: {
                     <tr key={m.id}>
                       <td className="whitespace-nowrap">{fmtDateTime(m.date)}</td>
                       <td>{link ? <Link href={link} className="btn-link">{MOVEMENT_LABEL[m.type]}</Link> : MOVEMENT_LABEL[m.type]}{m.source !== "MANUAL" && <span className="text-xs text-slate-400"> {m.source}</span>}</td>
-                      <td>{m.warehouse.name}</td>
+                      {!wid && <td>{m.warehouse.name}</td>}
                       <td>{m.batch?.lotNo}</td>
                       <td className={`num ${q < 0 ? "text-rose-600" : "text-emerald-700"}`}>{q > 0 ? "+" : ""}{fmtQty(q)}</td>
                       <td className={`num ${bal < 0 ? "text-rose-600" : ""}`}>{fmtQty(bal)}</td>
                       <td>{m.user?.name}</td>
-                      <td className="text-xs">{m.note}</td>
+                      <td className="wrap w-full text-xs text-slate-500">{m.note}</td>
                     </tr>
                   );
                 })}

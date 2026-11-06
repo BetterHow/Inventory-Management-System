@@ -37,7 +37,7 @@ export default async function StocktakesPage({ searchParams }: { searchParams: P
                   <td>{wh.get(s.warehouseId)}</td>
                   <td>{fmtDateTime(s.date)}</td>
                   <td>{s.status === "DONE" ? `已完成 ${fmtDateTime(s.completedAt)}` : <span className="text-amber-700">盤點中</span>}</td>
-                  <td>{s.note}</td>
+                  <td className="wrap">{s.note}</td>
                 </tr>
               ))}
             </tbody>
