@@ -1,0 +1,86 @@
+"use server";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
+import { attempt } from "@/lib/action";
+import { UserError, intVal, numVal, optInt, optStr, str, withParam } from "@/lib/form";
+import { nextNumber } from "@/lib/stock";
+import { dateOnly, num } from "@/lib/format";
+import { round2, todayTaipei } from "@/lib/logic";
+
+export async function addEntry(fd: FormData) {
+  const user = await requireUser();
+  const back = str(fd, "back") || "/purchase-list";
+  await attempt(back, async () => {
+    const code = str(fd, "item");
+    const item = await prisma.item.findFirst({
+      where: { OR: [{ code: code.split("｜")[0] }, { barcode: code }, { name: code }] },
+    });
+    if (!item) throw new UserError(`找不到品項「${code}」`);
+    const qty = numVal(fd, "qty");
+    if (qty <= 0) throw new UserError("數量要大於 0");
+    await prisma.purchaseListEntry.create({
+      data: {
+        itemId: item.id,
+        warehouseId: intVal(fd, "warehouseId"),
+        supplierId: optInt(fd, "supplierId") ?? item.defaultSupplierId,
+        qty,
+        note: optStr(fd, "note"),
+        createdById: user.id,
+      },
+    });
+  });
+  revalidatePath("/purchase-list");
+  redirect(withParam(back, "ok", "已加入待採購清單"));
+}
+
+export async function bulkAction(fd: FormData) {
+  const user = await requireUser();
+  const ids = fd.getAll("ids").map(Number).filter(Boolean);
+  const action = str(fd, "action");
+  let msg = "";
+  await attempt("/purchase-list", async () => {
+    if (ids.length === 0) throw new UserError("請先勾選項目");
+    const entries = await prisma.purchaseListEntry.findMany({ where: { id: { in: ids }, status: "PENDING" } });
+    if (action === "clear") {
+      await prisma.purchaseListEntry.deleteMany({ where: { id: { in: entries.map((e) => e.id) } } });
+      msg = `已清除 ${entries.length} 項`;
+      return;
+    }
+    // Turn into "待入庫" receipts, one per supplier + warehouse.
+    if (entries.some((e) => !e.supplierId)) throw new UserError("有項目沒有指定供應商，請先設定再轉進貨單");
+    const groups = new Map<string, typeof entries>();
+    for (const e of entries) {
+      const k = `${e.supplierId}:${e.warehouseId}`;
+      groups.set(k, [...(groups.get(k) ?? []), e]);
+    }
+    const items = new Map((await prisma.item.findMany({ where: { id: { in: entries.map((e) => e.itemId) } } })).map((i) => [i.id, i]));
+    const today = todayTaipei();
+    await prisma.$transaction(async (tx) => {
+      for (const group of groups.values()) {
+        const lines = group.map((e) => {
+          const price = num(items.get(e.itemId)?.refPrice);
+          return { itemId: e.itemId, qty: num(e.qty), unitPrice: price, amount: round2(num(e.qty) * price) };
+        });
+        const r = await tx.receipt.create({
+          data: {
+            number: await nextNumber(tx, "R", "receipt", today),
+            date: dateOnly(today),
+            supplierId: group[0].supplierId!,
+            warehouseId: group[0].warehouseId,
+            status: "ORDERED",
+            totalAmount: round2(lines.reduce((s, l) => s + l.amount, 0)),
+            createdById: user.id,
+            note: "由待採購清單轉入",
+            lines: { create: lines },
+          },
+        });
+        await tx.purchaseListEntry.updateMany({ where: { id: { in: group.map((e) => e.id) } }, data: { status: "ORDERED", receiptId: r.id } });
+      }
+    });
+    msg = `已轉成 ${groups.size} 張待入庫進貨單`;
+  });
+  revalidatePath("/purchase-list");
+  redirect("/purchase-list?ok=" + encodeURIComponent(msg));
+}
