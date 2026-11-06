@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { setUnit } from "@/app/(app)/unit-actions";
-import { NAV_START_EVENT } from "./NavProgress";
+import { NAV_START_EVENT, NAV_END_EVENT } from "./NavProgress";
 
 import { SIDEBAR_COOKIE } from "@/lib/prefs";
 
@@ -64,11 +64,18 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
   function switchUnit(v: string) {
     window.dispatchEvent(new Event(NAV_START_EVENT));
     startSwitch(async () => {
+      // The action's reply already carries this page redrawn for the new unit.
       await setUnit(v);
-      // Drop this page's own filters so it shows the new unit.
-      router.replace(path);
+      // Only when the page has its own filters in the address, drop them so it shows the new unit.
+      if (location.search) router.replace(path);
     });
   }
+  // The address may not change, so tell the top bar the switch is done.
+  const wasSwitching = useRef(false);
+  useEffect(() => {
+    if (wasSwitching.current && !switching) window.dispatchEvent(new Event(NAV_END_EVENT));
+    wasSwitching.current = switching;
+  }, [switching]);
   const unitSelect = (
     <select
       value={unit ?? "all"}

@@ -3,6 +3,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export const NAV_START_EVENT = "ims:navstart";
+/** Fire when work that started the bar finished without changing the address (e.g. switching 目前單位). */
+export const NAV_END_EVENT = "ims:navend";
 
 /**
  * A thin bar at the top of the screen while the next page loads, so a click never feels ignored.
@@ -37,11 +39,14 @@ export function NavProgress() {
       setActive(true);
     }
     const onStart = () => setActive(true);
+    const onEnd = () => setActive(false);
     document.addEventListener("click", onClick);
     window.addEventListener(NAV_START_EVENT, onStart);
+    window.addEventListener(NAV_END_EVENT, onEnd);
     return () => {
       document.removeEventListener("click", onClick);
       window.removeEventListener(NAV_START_EVENT, onStart);
+      window.removeEventListener(NAV_END_EVENT, onEnd);
     };
   }, []);
 
