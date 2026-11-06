@@ -1,0 +1,285 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(STAFF)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  movements StockMovement[]
+}
+
+// 庫別：依部門分開管理庫存（藥局、護理部、眼鏡部⋯）
+model Warehouse {
+  id        Int     @id @default(autoincrement())
+  code      String  @unique
+  name      String
+  note      String?
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  batches   Batch[]
+  movements StockMovement[]
+  settings  ItemWarehouseSetting[]
+}
+
+model Category {
+  id        Int    @id @default(autoincrement())
+  name      String @unique
+  sortOrder Int    @default(0)
+  items     Item[]
+}
+
+model Supplier {
+  id           Int     @id @default(autoincrement())
+  name         String
+  taxId        String?
+  contact      String?
+  phone        String?
+  paymentTerms String?
+  note         String?
+  active       Boolean @default(true)
+
+  items    Item[]
+  receipts Receipt[]
+  invoices Invoice[]
+}
+
+model Item {
+  id                Int       @id @default(autoincrement())
+  code              String    @unique // 料號
+  name              String
+  nhiCode           String? // 健保碼
+  barcode           String? // 國際條碼
+  spec              String?
+  unit              String    @default("個")
+  categoryId        Int?
+  category          Category? @relation(fields: [categoryId], references: [id])
+  defaultSupplierId Int?
+  defaultSupplier   Supplier? @relation(fields: [defaultSupplierId], references: [id])
+  refPrice          Decimal?  @db.Decimal(14, 2) // 參考單價（含稅）
+  trackBatch        Boolean   @default(true) // 是否管批號效期
+  note              String?
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+
+  batches   Batch[]
+  movements StockMovement[]
+  settings  ItemWarehouseSetting[]
+
+  @@index([barcode])
+  @@index([nhiCode])
+}
+
+// 每個品項在每個庫別的安全量設定。manualMonthlyUsage 留空 = 依近 90 天耗用自動計算
+model ItemWarehouseSetting {
+  id                 Int       @id @default(autoincrement())
+  itemId             Int
+  item               Item      @relation(fields: [itemId], references: [id])
+  warehouseId        Int
+  warehouse          Warehouse @relation(fields: [warehouseId], references: [id])
+  manualMonthlyUsage Decimal?  @db.Decimal(12, 2)
+  note               String?
+
+  @@unique([itemId, warehouseId])
+}
+
+// 批號庫存：qty 為剩餘數量（允許負數）
+model Batch {
+  id          Int       @id @default(autoincrement())
+  itemId      Int
+  item        Item      @relation(fields: [itemId], references: [id])
+  warehouseId Int
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  lotNo       String    @default("")
+  expiryDate  DateTime? @db.Date
+  unitCost    Decimal   @default(0) @db.Decimal(14, 4)
+  qty         Decimal   @default(0) @db.Decimal(12, 2)
+  createdAt   DateTime  @default(now())
+
+  movements StockMovement[]
+
+  @@index([itemId, warehouseId])
+}
+
+enum MovementType {
+  RECEIPT // 進貨入庫
+  CONSUME // 耗用
+  ADJUST // 盤點/調整
+  TRANSFER_OUT // 調出
+  TRANSFER_IN // 調入
+  SCRAP // 報廢
+  RETURN // 退貨
+}
+
+// 異動流水帳：庫存數字的唯一來源
+model StockMovement {
+  id          Int          @id @default(autoincrement())
+  date        DateTime
+  itemId      Int
+  item        Item         @relation(fields: [itemId], references: [id])
+  warehouseId Int
+  warehouse   Warehouse    @relation(fields: [warehouseId], references: [id])
+  batchId     Int?
+  batch       Batch?       @relation(fields: [batchId], references: [id])
+  type        MovementType
+  qty         Decimal      @db.Decimal(12, 2) // 正數=增加，負數=減少
+  unitCost    Decimal      @default(0) @db.Decimal(14, 4)
+  source      String       @default("MANUAL") // MANUAL / HIS / SCANNER
+  refType     String? // RECEIPT / CONSUMPTION / TRANSFER / STOCKTAKE
+  refId       Int?
+  note        String?
+  userId      Int?
+  user        User?        @relation(fields: [userId], references: [id])
+  createdAt   DateTime     @default(now())
+
+  @@index([itemId, warehouseId, date])
+  @@index([type, date])
+  @@index([refType, refId])
+}
+
+enum PurchaseListStatus {
+  PENDING // 待下單
+  ORDERED // 已下單（已轉成待入庫進貨單）
+}
+
+// 待採購清單
+model PurchaseListEntry {
+  id          Int                @id @default(autoincrement())
+  itemId      Int
+  warehouseId Int
+  supplierId  Int?
+  qty         Decimal            @db.Decimal(12, 2)
+  note        String?
+  status      PurchaseListStatus @default(PENDING)
+  receiptId   Int?
+  createdById Int?
+  createdAt   DateTime           @default(now())
+}
+
+enum ReceiptStatus {
+  ORDERED // 已下單，待入庫
+  PENDING_INSPECTION // 已到貨，待驗收
+  RECEIVED // 已入庫
+  CANCELLED
+}
+
+model Receipt {
+  id            Int           @id @default(autoincrement())
+  number        String        @unique
+  date          DateTime      @db.Date
+  supplierId    Int
+  supplier      Supplier      @relation(fields: [supplierId], references: [id])
+  warehouseId   Int
+  status        ReceiptStatus
+  totalAmount   Decimal       @default(0) @db.Decimal(14, 2)
+  invoiceId     Int?
+  invoice       Invoice?      @relation(fields: [invoiceId], references: [id])
+  note          String?
+  createdById   Int?
+  inspectedById Int?
+  inspectedAt   DateTime?
+  receivedAt    DateTime?
+  createdAt     DateTime      @default(now())
+
+  lines ReceiptLine[]
+}
+
+model ReceiptLine {
+  id         Int       @id @default(autoincrement())
+  receiptId  Int
+  receipt    Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  itemId     Int
+  qty        Decimal   @db.Decimal(12, 2)
+  freeQty    Decimal   @default(0) @db.Decimal(12, 2) // 贈品數量
+  unitPrice  Decimal   @default(0) @db.Decimal(14, 4)
+  amount     Decimal   @default(0) @db.Decimal(14, 2) // 使用者輸入的金額
+  lotNo      String    @default("")
+  expiryDate DateTime? @db.Date
+}
+
+// 發票：一張進貨單一張，或月結一張對多張進貨單。金額由使用者輸入，不自動加稅
+model Invoice {
+  id         Int       @id @default(autoincrement())
+  number     String
+  date       DateTime  @db.Date
+  supplierId Int
+  supplier   Supplier  @relation(fields: [supplierId], references: [id])
+  amount     Decimal   @db.Decimal(14, 2)
+  taxAmount  Decimal?  @db.Decimal(14, 2)
+  paid       Boolean   @default(false)
+  paidAt     DateTime? @db.Date
+  note       String?
+  createdAt  DateTime  @default(now())
+
+  receipts Receipt[]
+}
+
+model Consumption {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  warehouseId Int
+  note        String?
+  source      String   @default("MANUAL")
+  createdById Int?
+  createdAt   DateTime @default(now())
+}
+
+model Transfer {
+  id              Int      @id @default(autoincrement())
+  number          String   @unique
+  date            DateTime
+  fromWarehouseId Int
+  toWarehouseId   Int
+  note            String?
+  createdById     Int?
+  createdAt       DateTime @default(now())
+}
+
+enum StocktakeStatus {
+  DRAFT
+  DONE
+}
+
+model Stocktake {
+  id          Int             @id @default(autoincrement())
+  number      String          @unique
+  date        DateTime
+  warehouseId Int
+  status      StocktakeStatus @default(DRAFT)
+  note        String?
+  createdById Int?
+  createdAt   DateTime        @default(now())
+  completedAt DateTime?
+
+  lines StocktakeLine[]
+}
+
+model StocktakeLine {
+  id          Int       @id @default(autoincrement())
+  stocktakeId Int
+  stocktake   Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  itemId      Int
+  systemQty   Decimal   @db.Decimal(12, 2)
+  countedQty  Decimal?  @db.Decimal(12, 2)
+}
+
+model Setting {
+  key   String @id
+  value String
+}
