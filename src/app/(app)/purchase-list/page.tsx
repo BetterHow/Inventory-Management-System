@@ -4,7 +4,7 @@ import { PageHeader, Empty, Field } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { fmtDateTime, fmtQty, num } from "@/lib/format";
 import { activeWarehouses } from "@/lib/pickers";
-import { addEntry, bulkAction } from "./actions";
+import { addEntry, bulkAction, deleteEntry } from "./actions";
 
 export default async function PurchaseListPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
@@ -22,7 +22,7 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
     <div className="space-y-4">
       <PageHeader title="待採購清單" />
       <p className="text-sm text-slate-500">
-        記下要訂的東西。下單後可以直接清除，或轉成「待入庫」進貨單，到貨時再填批號效期入庫。
+        記下要訂的東西。下單後轉成「待入庫」進貨單，到貨時再填批號效期入庫；不需要的直接刪除。
       </p>
       <Flash sp={sp} />
 
@@ -48,7 +48,7 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
         {entries.length === 0 ? <Empty>清單是空的</Empty> : (
           <>
             <table className="table">
-              <thead><tr><th></th><th>品項</th><th>庫別</th><th className="num">數量</th><th>供應商</th><th>加入時間</th></tr></thead>
+              <thead><tr><th></th><th>品項</th><th>庫別</th><th className="num">數量</th><th>供應商</th><th>加入時間</th><th></th></tr></thead>
               <tbody>
                 {entries.map((e) => {
                   const it = itemMap.get(e.itemId);
@@ -60,6 +60,9 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
                       <td className="num">{fmtQty(e.qty)} {it?.unit}</td>
                       <td>{suppliers.find((s) => s.id === e.supplierId)?.name ?? <span className="text-rose-600">未指定</span>}</td>
                       <td className="text-xs text-slate-500">{fmtDateTime(e.createdAt)}</td>
+                      <td className="w-16 text-right">
+                        <button formAction={deleteEntry.bind(null, e.id)} formNoValidate className="text-sm text-slate-400 hover:text-rose-600">刪除</button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -67,7 +70,7 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
             </table>
             <div className="flex flex-wrap gap-2 p-3">
               <button name="action" value="toReceipt" className="btn">勾選的轉成待入庫進貨單</button>
-              <button name="action" value="clear" className="btn-secondary">勾選的已下單，清除</button>
+              <button name="action" value="clear" className="btn-secondary">刪除勾選的</button>
             </div>
           </>
         )}

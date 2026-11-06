@@ -45,7 +45,7 @@ export async function bulkAction(fd: FormData) {
     const entries = await prisma.purchaseListEntry.findMany({ where: { id: { in: ids }, status: "PENDING" } });
     if (action === "clear") {
       await prisma.purchaseListEntry.deleteMany({ where: { id: { in: entries.map((e) => e.id) } } });
-      msg = `已清除 ${entries.length} 項`;
+      msg = `已刪除 ${entries.length} 項`;
       return;
     }
     // Turn into "待入庫" receipts, one per supplier + warehouse.
@@ -83,4 +83,11 @@ export async function bulkAction(fd: FormData) {
   });
   revalidatePath("/purchase-list");
   redirect("/purchase-list?ok=" + encodeURIComponent(msg));
+}
+
+export async function deleteEntry(id: number) {
+  await requireUser();
+  await prisma.purchaseListEntry.deleteMany({ where: { id, status: "PENDING" } });
+  revalidatePath("/purchase-list");
+  redirect("/purchase-list?ok=" + encodeURIComponent("已刪除"));
 }
