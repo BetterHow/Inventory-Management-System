@@ -1,5 +1,5 @@
 import type { Receipt, ReceiptLine, Supplier, Warehouse } from "@prisma/client";
-import { Field } from "./ui";
+import { Field, CancelLink } from "./ui";
 import { LineEditor, type PickItem, type Line } from "./LineEditor";
 import { fmtDate, num } from "@/lib/format";
 import { todayTaipei } from "@/lib/logic";
@@ -60,6 +60,7 @@ export function ReceiptForm({ receipt, suppliers, warehouses, items, inspectionE
           {inspectionEnabled ? "已到貨，送驗收" : "已到貨，入庫"}
         </button>
         <button name="intent" value="order" className="btn-secondary">只下單（待入庫）</button>
+        <CancelLink href={receipt ? `/receipts/${receipt.id}` : "/receipts"} />
       </div>
     </form>
   );

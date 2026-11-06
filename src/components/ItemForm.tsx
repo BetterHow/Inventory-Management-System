@@ -1,12 +1,13 @@
 import type { Item, Category, Supplier } from "@prisma/client";
-import { Field } from "./ui";
+import { Field, CancelLink } from "./ui";
 import { num } from "@/lib/format";
 
-export function ItemForm({ item, categories, suppliers, action }: {
+export function ItemForm({ item, categories, suppliers, action, cancelHref = "/items" }: {
   item?: Item;
   categories: Category[];
   suppliers: Supplier[];
   action: (fd: FormData) => Promise<void>;
+  cancelHref?: string;
 }) {
   return (
     <form action={action} className="card grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
@@ -38,7 +39,7 @@ export function ItemForm({ item, categories, suppliers, action }: {
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="active" defaultChecked={item?.active ?? true} /> 使用中（取消勾選即停用）
       </label>
-      <div className="sm:col-span-2"><button className="btn">儲存</button></div>
+      <div className="flex gap-2 sm:col-span-2"><button className="btn">儲存</button><CancelLink href={cancelHref} /></div>
     </form>
   );
 }

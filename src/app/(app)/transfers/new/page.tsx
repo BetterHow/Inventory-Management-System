@@ -1,4 +1,4 @@
-import { PageHeader, Field } from "@/components/ui";
+import { PageHeader, Field, CancelLink } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { WarehouseLines } from "@/components/LineEditor";
 import { pickItems, pickStock, activeWarehouses } from "@/lib/pickers";
@@ -23,7 +23,7 @@ export default async function NewTransferPage({ searchParams }: { searchParams: 
           <Field label="備註"><input name="note" className="input" /></Field>
         </div>
         <WarehouseLines mode="transfer" warehouseLabel="調出庫別" items={items} batches={batches} stock={stock} warehouses={warehouses} />
-        <button className="btn">確認調撥</button>
+        <div className="flex gap-2"><button className="btn">確認調撥</button><CancelLink href="/transfers" /></div>
       </form>
     </div>
   );

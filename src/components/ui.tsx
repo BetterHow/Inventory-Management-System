@@ -10,6 +10,11 @@ export function PageHeader({ title, children }: { title: string; children?: Reac
   );
 }
 
+/** A "cancel" button next to save: leaves the form without saving anything. */
+export function CancelLink({ href, label = "取消" }: { href: string; label?: string }) {
+  return <Link href={href} className="btn-secondary">{label}</Link>;
+}
+
 export function LinkButton({ href, children, secondary }: { href: string; children: React.ReactNode; secondary?: boolean }) {
   return (
     <Link href={href} className={secondary ? "btn-secondary" : "btn"}>

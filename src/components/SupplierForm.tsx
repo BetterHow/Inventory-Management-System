@@ -1,5 +1,5 @@
 import type { Supplier } from "@prisma/client";
-import { Field } from "./ui";
+import { Field, CancelLink } from "./ui";
 
 export function SupplierForm({ s, action }: { s?: Supplier; action: (fd: FormData) => Promise<void> }) {
   return (
@@ -13,7 +13,7 @@ export function SupplierForm({ s, action }: { s?: Supplier; action: (fd: FormDat
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="active" defaultChecked={s?.active ?? true} /> 使用中
       </label>
-      <div className="sm:col-span-2"><button className="btn">儲存</button></div>
+      <div className="flex gap-2 sm:col-span-2"><button className="btn">儲存</button><CancelLink href="/suppliers" /></div>
     </form>
   );
 }

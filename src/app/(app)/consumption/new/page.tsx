@@ -1,4 +1,4 @@
-import { PageHeader, Field } from "@/components/ui";
+import { PageHeader, Field, CancelLink } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { WarehouseLines } from "@/components/LineEditor";
 import { pickItems, pickStock, activeWarehouses } from "@/lib/pickers";
@@ -21,7 +21,7 @@ export default async function NewConsumptionPage({ searchParams }: { searchParam
         </div>
         <WarehouseLines mode="consume" items={items} batches={batches} stock={stock} warehouses={warehouses}
           defaultWarehouseId={sp.warehouse ? Number(sp.warehouse) : undefined} />
-        <button className="btn">確認扣庫</button>
+        <div className="flex gap-2"><button className="btn">確認扣庫</button><CancelLink href="/consumption" /></div>
       </form>
     </div>
   );

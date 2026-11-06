@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { PageHeader, Field, Notice } from "@/components/ui";
+import { PageHeader, Field, Notice, CancelLink } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { fmtDate, fmtMoney, num, RECEIPT_STATUS_LABEL } from "@/lib/format";
 import { sum, todayTaipei } from "@/lib/logic";
@@ -32,7 +32,7 @@ export default async function InvoicePage({ params, searchParams }: {
         <label className="flex items-center gap-2 pt-5 text-sm"><input type="checkbox" name="paid" defaultChecked={inv.paid} /> 已付款</label>
         <Field label="付款日期"><input type="date" name="paidAt" defaultValue={inv.paidAt ? fmtDate(inv.paidAt, true) : todayTaipei()} className="input" /></Field>
         <Field label="備註"><input name="note" defaultValue={inv.note ?? ""} className="input" /></Field>
-        <div className="col-span-2 sm:col-span-4"><button className="btn">儲存</button></div>
+        <div className="col-span-2 flex gap-2 sm:col-span-4"><button className="btn">儲存</button><CancelLink href="/invoices" label="返回列表" /></div>
       </form>
       <div className="card overflow-x-auto p-0">
         <table className="table">
