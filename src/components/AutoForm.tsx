@@ -4,11 +4,16 @@ import { useRef, useTransition } from "react";
 import { NAV_START_EVENT } from "./NavProgress";
 
 /**
- * A filter form that applies itself: picking from a dropdown or date updates the list right away,
- * and typing in a search box updates it after a short pause. No "查詢" button needed.
+ * A filter form: picking from a dropdown or ticking a box updates the list right away.
+ * Typed text and dates wait for the 查詢 button (or Enter), so the list doesn't jump while typing.
  * Empty fields are left out of the address so links stay short.
  */
-export function AutoForm({ className, children, clearHref }: { className?: string; children: React.ReactNode; clearHref?: string }) {
+export function AutoForm({ className, children, clearHref, noButton }: {
+  className?: string;
+  children: React.ReactNode;
+  clearHref?: string;
+  noButton?: boolean; // only dropdowns, nothing to type
+}) {
   const path = usePathname();
   const router = useRouter();
   const ref = useRef<HTMLFormElement>(null);
@@ -37,13 +42,15 @@ export function AutoForm({ className, children, clearHref }: { className?: strin
       }}
       onChange={(e) => {
         const t = e.target as unknown as HTMLInputElement;
-        const typing = t.tagName === "INPUT" && ["text", "search", "number"].includes(t.type);
-        if (timer.current) clearTimeout(timer.current);
-        if (typing) timer.current = setTimeout(apply, 500);
-        else apply();
+        if (t.tagName === "SELECT" || t.type === "checkbox" || t.type === "radio") apply();
       }}
     >
       {children}
+      {noButton ? (
+        <button type="submit" className="sr-only" tabIndex={-1}>查詢</button>
+      ) : (
+        <button type="submit" className="btn">查詢</button>
+      )}
       {clearHref && (
         <button
           type="button"
@@ -63,7 +70,6 @@ export function AutoForm({ className, children, clearHref }: { className?: strin
           清除條件
         </button>
       )}
-      <button type="submit" className="sr-only" tabIndex={-1}>查詢</button>
     </form>
   );
 }

@@ -15,7 +15,11 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const [warehouses, user] = await Promise.all([activeWarehouses(), requireUser()]);
   const wid = sp.warehouse === "all" ? undefined : Number(sp.warehouse ?? user.defaultWarehouseId ?? warehouses[0]?.id);
-  const all = await stockOverview(wid);
+  const everything = await stockOverview(wid);
+  // In one warehouse, hide items that warehouse never had (e.g. 普拿疼 in 護理部) unless asked.
+  const showAllItems = sp.allItems === "1";
+  const all = showAllItems ? everything : everything.filter((r) => r.inWarehouse);
+  const hiddenCount = everything.length - all.length;
   const q = (sp.q ?? "").toLowerCase();
   const status = sp.status as SafetyStatus | undefined;
   const rows = all.filter(
@@ -23,7 +27,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   );
   const counts = Object.fromEntries(FILTERS.map((f) => [f, all.filter((r) => r.status === f).length]));
   const base = (extra: Record<string, string>) =>
-    "/stock?" + new URLSearchParams({ warehouse: sp.warehouse ?? String(wid ?? "all"), ...(sp.q ? { q: sp.q } : {}), ...extra });
+    "/stock?" + new URLSearchParams({ warehouse: sp.warehouse ?? String(wid ?? "all"), ...(sp.q ? { q: sp.q } : {}), ...(showAllItems ? { allItems: "1" } : {}), ...extra });
   const here = base(status ? { status } : {});
 
   return (
@@ -37,6 +41,11 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         </select>
         <input name="q" defaultValue={sp.q} placeholder="搜尋料號或品名" className="input max-w-xs" />
         {status && <input type="hidden" name="status" value={status} />}
+        {wid && (
+          <label className="flex items-center gap-1 text-sm text-slate-600" title="例如藥局的品項，在護理部從沒進過貨或用過">
+            <input type="checkbox" name="allItems" value="1" defaultChecked={showAllItems} /> 含本庫別沒有的品項{hiddenCount > 0 && `（${hiddenCount}）`}
+          </label>
+        )}
       </AutoForm>
       <div className="mb-3 flex flex-wrap gap-1 text-sm">
         <Link href={base({})} className={`rounded-full px-3 py-1 ${!status ? "bg-teal-600 text-white" : "border border-slate-200 bg-white"}`}>全部 ({all.length})</Link>
