@@ -98,7 +98,7 @@ export function WarehousePills({ path, sp, warehouses, current, mine }: {
       { href: withParams(path, sp, { warehouse: "all" }), label: "全部庫別", active: current === undefined },
       ...warehouses.map((w) => ({
         href: withParams(path, sp, { warehouse: String(w.id) }),
-        label: w.id === mine ? `${w.name}（我的）` : w.name,
+        label: w.id === mine ? `${w.name}（目前單位）` : w.name,
         active: current === w.id,
       })),
     ]} />

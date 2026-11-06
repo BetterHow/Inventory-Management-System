@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
+import { setUnit } from "@/app/(app)/unit-actions";
+import { NAV_START_EVENT } from "./NavProgress";
 
 import { SIDEBAR_COOKIE } from "@/lib/prefs";
 
@@ -45,7 +47,9 @@ const NAV: NavGroup[] = [
   },
 ];
 
-export default function Sidebar({ userName, isAdmin, clinicName, logout, initialCollapsed = false }: {
+export default function Sidebar({ userName, isAdmin, clinicName, logout, initialCollapsed = false, unit, units }: {
+  unit: number | null;
+  units: { id: number; name: string }[];
   initialCollapsed?: boolean;
   userName: string;
   isAdmin: boolean;
@@ -54,6 +58,29 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
 }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const [switching, startSwitch] = useTransition();
+  const unitName = unit ? units.find((u) => u.id === unit)?.name : "全部單位";
+  function switchUnit(v: string) {
+    window.dispatchEvent(new Event(NAV_START_EVENT));
+    startSwitch(async () => {
+      await setUnit(v);
+      // Drop this page's own filters so it shows the new unit.
+      router.replace(path);
+    });
+  }
+  const unitSelect = (
+    <select
+      value={unit ?? "all"}
+      disabled={switching}
+      onChange={(e) => switchUnit(e.target.value)}
+      aria-label="目前單位"
+      className="w-full rounded-md border border-slate-600 bg-slate-700 px-2 py-1.5 text-sm text-white focus:border-teal-400 focus:outline-none"
+    >
+      {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+      <option value="all">全部單位</option>
+    </select>
+  );
   // Desktop only: fold the sidebar into a narrow strip. Remembered in a cookie so it stays folded.
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   function toggle() {
@@ -70,7 +97,7 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
   return (
     <>
       <div className="flex items-center justify-between bg-teal-700 px-4 py-3 text-white md:hidden">
-        <span className="font-semibold">{clinicName} 庫存管理</span>
+        <span className="font-semibold">{clinicName} 庫存管理 <span className="text-sm font-normal text-teal-100">· {unitName}</span></span>
         <button onClick={() => setOpen(!open)} className="rounded border border-white/40 px-2 py-0.5 text-sm">
           選單
         </button>
@@ -96,6 +123,15 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
             {collapsed ? "»" : "«"}
           </button>
         </div>
+        <div className={`px-3 pb-4 pt-3 md:pt-0 ${collapsed ? "md:hidden" : ""}`}>
+          <div className="mb-1 text-xs text-slate-400">目前單位</div>
+          {unitSelect}
+        </div>
+        {collapsed && (
+          <div className="hidden px-1 pb-3 text-center text-xs text-teal-300 md:block" title={`目前單位：${unitName}（展開側邊欄可切換）`}>
+            {unitName?.slice(0, 2)}
+          </div>
+        )}
         <nav className={`pb-4 ${collapsed ? "px-2 md:px-1.5" : "px-2"}`}>
           {NAV.map((g) => {
             const links = g.links.filter((l) => !l.admin || isAdmin);

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "./db";
 import { SESSION_COOKIE, verifySession } from "./session";
+import { UNIT_COOKIE } from "./prefs";
 
 /** The signed-in user, re-checked against the database so disabled accounts lose access at once. */
 export const getCurrentUser = cache(async () => {
@@ -28,11 +29,22 @@ export async function requireAdmin() {
 }
 
 /**
- * Which warehouse a list page shows: "all" = every warehouse, a number = that one,
- * nothing chosen = the user's own warehouse (負責庫別) if they have one.
+ * 目前單位: the warehouse this person is working in, chosen at the top of the sidebar.
+ * Falls back to their 負責庫別. undefined = all units.
  */
-export function pickWarehouse(param: string | undefined, user: { defaultWarehouseId: number | null }): number | undefined {
+export const getUnit = cache(async (): Promise<number | undefined> => {
+  const user = await requireUser();
+  const v = (await cookies()).get(UNIT_COOKIE)?.value;
+  if (v === "all") return undefined;
+  const id = Number(v) || user.defaultWarehouseId;
+  if (!id) return undefined;
+  const wh = await prisma.warehouse.findFirst({ where: { id, active: true }, select: { id: true } });
+  return wh?.id;
+});
+
+/** Which warehouse a list page shows: "all" = every warehouse, a number = that one, nothing chosen = 目前單位. */
+export function pickWarehouse(param: string | undefined, unit: number | undefined): number | undefined {
   if (param === "all") return undefined;
   if (param && Number(param) > 0) return Number(param);
-  return user.defaultWarehouseId ?? undefined;
+  return unit;
 }

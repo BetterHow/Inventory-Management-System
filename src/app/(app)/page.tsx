@@ -4,6 +4,7 @@ import { SafetyBadge, ExpiryBadge } from "@/components/ui";
 import { stockOverview } from "@/lib/overview";
 import { fmtDate, fmtMoney, fmtQty, num } from "@/lib/format";
 import { parseTaipeiDate, sum, taipeiParts } from "@/lib/logic";
+import { getUnit } from "@/lib/auth";
 
 function Stat({ label, value, href, tone }: { label: string; value: string | number; href: string; tone?: "warn" | "bad" }) {
   const color = tone === "bad" ? "text-rose-600" : tone === "warn" ? "text-amber-600" : "text-slate-800";
@@ -19,13 +20,16 @@ export default async function Dashboard() {
   const p = taipeiParts(new Date());
   const monthStart = parseTaipeiDate(`${p.y}-${String(p.m).padStart(2, "0")}-01`);
   const monthStartDate = new Date(Date.UTC(p.y, p.m - 1, 1));
+  const unit = await getUnit();
+  const wh = unit ? { warehouseId: unit } : {};
+  const unitName = unit ? (await prisma.warehouse.findUnique({ where: { id: unit } }))?.name : null;
   const [rows, consumed, received, ordered, pendingInspection, noInvoice, unpaid] = await Promise.all([
-    stockOverview(),
-    prisma.stockMovement.findMany({ where: { type: "CONSUME", date: { gte: monthStart } }, select: { qty: true, unitCost: true } }),
-    prisma.receipt.aggregate({ where: { status: "RECEIVED", date: { gte: monthStartDate } }, _sum: { totalAmount: true } }),
-    prisma.receipt.count({ where: { status: "ORDERED" } }),
-    prisma.receipt.count({ where: { status: "PENDING_INSPECTION" } }),
-    prisma.receipt.count({ where: { status: "RECEIVED", invoiceId: null } }),
+    stockOverview(unit).then((r) => r.filter((x) => x.inWarehouse)),
+    prisma.stockMovement.findMany({ where: { type: "CONSUME", date: { gte: monthStart }, ...wh }, select: { qty: true, unitCost: true } }),
+    prisma.receipt.aggregate({ where: { status: "RECEIVED", date: { gte: monthStartDate }, ...wh }, _sum: { totalAmount: true } }),
+    prisma.receipt.count({ where: { status: "ORDERED", ...wh } }),
+    prisma.receipt.count({ where: { status: "PENDING_INSPECTION", ...wh } }),
+    prisma.receipt.count({ where: { status: "RECEIVED", invoiceId: null, ...wh } }),
     prisma.invoice.aggregate({ where: { paid: false }, _sum: { amount: true } }),
   ]);
   const low = rows.filter((r) => r.status === "NEGATIVE" || r.status === "LT1");
@@ -35,14 +39,14 @@ export default async function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">首頁</h1>
+        <h1 className="text-xl font-semibold">首頁{unitName && <span className="ml-2 text-base font-normal text-slate-500">{unitName}</span>}</h1>
         <div className="flex gap-2">
           <Link href="/consumption/new" className="btn">登記耗用</Link>
           <Link href="/receipts/new" className="btn-secondary">新增進貨</Link>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="不足1個月／負庫存" value={low.length} href="/stock?warehouse=all&status=LT1" tone={low.length ? "bad" : undefined} />
+        <Stat label="不足1個月／負庫存" value={low.length} href="/stock?status=LT1" tone={low.length ? "bad" : undefined} />
         <Stat label="效期需注意的品項" value={expiring.length} href="/reports?tab=expiry" tone={expiring.length ? "warn" : undefined} />
         <Stat label="本月耗用金額" value={fmtMoney(consumedAmt)} href="/reports?tab=consumption&measure=amount" />
         <Stat label="本月進貨金額" value={fmtMoney(received._sum.totalAmount)} href="/reports?tab=receiving" />
@@ -53,7 +57,7 @@ export default async function Dashboard() {
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="card">
-          <h2 className="mb-2 font-semibold">需要補貨（全部庫別合計）</h2>
+          <h2 className="mb-2 font-semibold">需要補貨{unitName ? `（${unitName}）` : "（全部單位合計）"}</h2>
           {low.length === 0 ? <p className="text-sm text-slate-400">目前沒有</p> : (
             <table className="table">
               <tbody>

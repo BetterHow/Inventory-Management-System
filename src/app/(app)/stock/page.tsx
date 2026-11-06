@@ -7,14 +7,14 @@ import { fmtDate, fmtMoney, fmtQty } from "@/lib/format";
 import { SAFETY_LABEL, sum, type SafetyStatus } from "@/lib/logic";
 import { addEntry } from "../purchase-list/actions";
 import { AutoForm } from "@/components/AutoForm";
-import { requireUser } from "@/lib/auth";
+import { getUnit, pickWarehouse } from "@/lib/auth";
 
 const FILTERS: SafetyStatus[] = ["NEGATIVE", "LT1", "LT2", "LT3", "OK", "NONE"];
 
 export default async function StockPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const [warehouses, user] = await Promise.all([activeWarehouses(), requireUser()]);
-  const wid = sp.warehouse === "all" ? undefined : Number(sp.warehouse ?? user.defaultWarehouseId ?? warehouses[0]?.id);
+  const [warehouses, unit] = await Promise.all([activeWarehouses(), getUnit()]);
+  const wid = pickWarehouse(sp.warehouse, unit);
   const everything = await stockOverview(wid);
   // In one warehouse, hide items that warehouse never had (e.g. 普拿疼 in 護理部) unless asked.
   const showAllItems = sp.allItems === "1";
@@ -35,8 +35,8 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
       <PageHeader title="庫存總覽" />
       <Flash sp={sp} />
       <AutoForm className="mb-3 flex flex-wrap gap-2">
-        <select name="warehouse" defaultValue={sp.warehouse ?? String(wid)} className="input max-w-[12rem]">
-          {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}{w.id === user.defaultWarehouseId ? "（我的）" : ""}</option>)}
+        <select name="warehouse" defaultValue={wid ? String(wid) : "all"} className="input max-w-[12rem]">
+          {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}{w.id === unit ? "（目前單位）" : ""}</option>)}
           <option value="all">全部庫別合計</option>
         </select>
         <input name="q" defaultValue={sp.q} placeholder="搜尋料號或品名" className="input max-w-xs" />

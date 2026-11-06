@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type PickItem = {
   id: number;
@@ -40,8 +40,10 @@ export function LineEditor({
   batches = [],
   stock = {},
   warehouseId,
+  itemsByWh,
 }: {
   mode: Mode;
+  itemsByWh?: Record<number, number[]>; // items each warehouse has had; the search lists those unless "全部品項" is ticked
   items: PickItem[];
   initial?: Line[];
   batches?: PickBatch[];
@@ -53,10 +55,36 @@ export function LineEditor({
   const [msg, setMsg] = useState("");
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
+  const moved = useRef(false); // arrow keys used, so Enter on an empty box picks the highlighted item
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
-  const matches = useMemo(() => searchItems(items, query), [items, query]);
+  // Which warehouse the items are for: given directly, or read from the form's 庫別 dropdown.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [formWh, setFormWh] = useState<number | undefined>();
+  useEffect(() => {
+    if (warehouseId !== undefined) return;
+    const sel = rootRef.current?.closest("form")?.querySelector<HTMLSelectElement>("select[name=warehouseId]");
+    if (!sel) return;
+    const update = () => setFormWh(Number(sel.value) || undefined);
+    update();
+    sel.addEventListener("change", update);
+    return () => sel.removeEventListener("change", update);
+  }, [warehouseId]);
+  const wh = warehouseId ?? formWh;
+  const [allItems, setAllItems] = useState(false);
+  const pool = useMemo(() => {
+    const ids = itemsByWh && wh ? new Set(itemsByWh[wh] ?? []) : null;
+    return ids && !allItems ? items.filter((i) => ids.has(i.id)) : items;
+  }, [items, allItems, wh, itemsByWh]);
+  const filtered = Boolean(itemsByWh && wh);
+  const hiddenCount = items.length - pool.length;
+
+  // Typed text: search. Empty box: this unit's items in code order.
+  const matches = useMemo(
+    () => (query.trim() ? searchItems(pool, query) : [...pool].sort((a, b) => a.code.localeCompare(b.code, "en", { numeric: true })).slice(0, 100)),
+    [pool, query],
+  );
 
   function find(q: string): PickItem | undefined {
     const s = q.trim().toLowerCase();
@@ -109,7 +137,7 @@ export function LineEditor({
   const total = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
 
   return (
-    <div>
+    <div ref={rootRef}>
       <input type="hidden" name="lines" value={JSON.stringify(lines)} />
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative w-full max-w-md">
@@ -118,6 +146,7 @@ export function LineEditor({
             autoComplete="off"
             onChange={(e) => {
               setQuery(e.target.value);
+              moved.current = false;
               setOpen(true);
               setHi(0);
               setMsg("");
@@ -126,6 +155,7 @@ export function LineEditor({
             onBlur={() => setOpen(false)}
             onKeyDown={(e) => {
               const showing = open && matches.length > 0;
+              if ((e.key === "ArrowDown" || e.key === "ArrowUp") && showing) moved.current = true;
               if (e.key === "ArrowDown" && showing) {
                 e.preventDefault();
                 setHi((hi + 1) % matches.length);
@@ -137,13 +167,13 @@ export function LineEditor({
               } else if (e.key === "Enter") {
                 e.preventDefault();
                 // A scanned barcode or exact code wins; otherwise take the highlighted suggestion.
-                add(find(query) ?? (showing ? matches[hi] : undefined));
+                add(find(query) ?? (showing && (query.trim() || moved.current) ? matches[hi] : undefined));
               }
             }}
             placeholder="掃條碼，或輸入料號／品名／健保碼"
             className="input"
           />
-          {open && query.trim() !== "" && (
+          {open && (query.trim() !== "" || matches.length > 0) && (
             <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg">
               {matches.length === 0 && <li className="px-3 py-2 text-slate-400">沒有符合的品項</li>}
               {matches.map((it, i) => (
@@ -168,7 +198,12 @@ export function LineEditor({
             </ul>
           )}
         </div>
-        <button type="button" className="btn-secondary" onClick={() => add(find(query) ?? matches[hi])}>加入</button>
+        <button type="button" className="btn-secondary" onClick={() => add(find(query) ?? (query.trim() || moved.current ? matches[hi] : undefined))}>加入</button>
+        {filtered && (hiddenCount > 0 || allItems) && (
+          <label className="flex items-center gap-1 text-sm text-slate-600" title="預設只列這個單位用過的品項">
+            <input type="checkbox" checked={allItems} onChange={(e) => setAllItems(e.target.checked)} /> 全部品項{!allItems && `（另有 ${hiddenCount} 項）`}
+          </label>
+        )}
         {msg && <span className="text-sm text-rose-600">{msg}</span>}
       </div>
 
@@ -323,6 +358,7 @@ export function WarehouseLines(props: {
   warehouses: { id: number; name: string }[];
   defaultWarehouseId?: number;
   warehouseLabel?: string;
+  itemsByWh?: Record<number, number[]>;
 }) {
   const [wid, setWid] = useState<number>(props.defaultWarehouseId ?? props.warehouses[0]?.id ?? 0);
   return (
@@ -333,7 +369,7 @@ export function WarehouseLines(props: {
           {props.warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
       </label>
-      <LineEditor mode={props.mode} items={props.items} batches={props.batches} stock={props.stock} warehouseId={wid} />
+      <LineEditor mode={props.mode} items={props.items} batches={props.batches} stock={props.stock} warehouseId={wid} itemsByWh={props.itemsByWh} />
     </div>
   );
 }

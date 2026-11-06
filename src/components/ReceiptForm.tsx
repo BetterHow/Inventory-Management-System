@@ -4,7 +4,8 @@ import { LineEditor, type PickItem, type Line } from "./LineEditor";
 import { fmtDate, num } from "@/lib/format";
 import { todayTaipei } from "@/lib/logic";
 
-export function ReceiptForm({ receipt, suppliers, warehouses, items, inspectionEnabled, action, defaultWarehouseId }: {
+export function ReceiptForm({ receipt, suppliers, warehouses, items, inspectionEnabled, action, defaultWarehouseId, itemsByWh }: {
+  itemsByWh?: Record<number, number[]>;
   defaultWarehouseId?: number | null;
   receipt?: Receipt & { lines: ReceiptLine[] };
   suppliers: Supplier[];
@@ -41,7 +42,7 @@ export function ReceiptForm({ receipt, suppliers, warehouses, items, inspectionE
         <Field label="備註"><input name="note" defaultValue={receipt?.note ?? ""} className="input" /></Field>
       </div>
 
-      <LineEditor mode="receipt" items={items} initial={initial} />
+      <LineEditor mode="receipt" items={items} initial={initial} itemsByWh={itemsByWh} />
       <p className="text-xs text-slate-500">金額預設為數量×單價，可直接改成發票上的金額。系統不會自動加稅。</p>
 
       {!receipt && (

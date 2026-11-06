@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getUnit } from "@/lib/auth";
 import { AutoForm } from "@/components/AutoForm";
 import { prisma } from "@/lib/db";
 import { PageHeader, Field, Empty } from "@/components/ui";
@@ -14,7 +15,8 @@ const TABS: [string, string][] = [
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const p = defaultParams(sp);
+  const unit = await getUnit();
+  const p = defaultParams({ ...sp, warehouse: sp.warehouse ?? (unit ? String(unit) : "all") });
   const [report, warehouses, categories] = await Promise.all([
     buildReport(p),
     activeWarehouses(),

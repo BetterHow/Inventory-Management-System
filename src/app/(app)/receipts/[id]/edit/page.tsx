@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { ReceiptForm } from "@/components/ReceiptForm";
-import { pickItems, activeWarehouses } from "@/lib/pickers";
+import { pickItems, activeWarehouses, itemsByWarehouse } from "@/lib/pickers";
 import { getSettings } from "@/lib/settings";
 import { saveReceipt } from "../../actions";
 
@@ -20,11 +20,12 @@ export default async function EditReceiptPage({ params, searchParams }: {
     pickItems(),
     getSettings(),
   ]);
+  const byWh = await itemsByWarehouse();
   return (
     <div>
       <PageHeader title={`編輯進貨單 ${receipt.number}`} />
       <Flash sp={sp} />
-      <ReceiptForm receipt={receipt} suppliers={suppliers} warehouses={warehouses} items={items}
+      <ReceiptForm itemsByWh={byWh} receipt={receipt} suppliers={suppliers} warehouses={warehouses} items={items}
         inspectionEnabled={settings.inspectionEnabled} action={saveReceipt.bind(null, receipt.id)} />
     </div>
   );

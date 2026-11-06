@@ -10,7 +10,12 @@ const label = (i: PickItem) => `${i.code}｜${i.name}`;
  * The list opens on click even after an item is chosen, showing the items around it in code order,
  * so a neighbouring item is one click away. Typing something else searches code, name, 健保碼 and barcode.
  */
-export function ItemPicker({ name, items, required }: { name: string; items: PickItem[]; required?: boolean }) {
+export function ItemPicker({ name, items, required, itemsByWh }: {
+  name: string;
+  items: PickItem[];
+  required?: boolean;
+  itemsByWh?: Record<number, number[]>; // list only the items of the form's 庫別, unless "顯示全部品項" is clicked
+}) {
   const [value, setValue] = useState("");
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
@@ -25,11 +30,26 @@ export function ItemPicker({ name, items, required }: { name: string; items: Pic
     form.addEventListener("reset", clear);
     return () => form.removeEventListener("reset", clear);
   }, []);
-  const sorted = useMemo(() => [...items].sort(byCode), [items]);
+  const [formWh, setFormWh] = useState<number | undefined>();
+  const [allItems, setAllItems] = useState(false);
+  useEffect(() => {
+    const sel = inputRef.current?.form?.querySelector<HTMLSelectElement>("select[name=warehouseId]");
+    if (!sel) return;
+    const update = () => setFormWh(Number(sel.value) || undefined);
+    update();
+    sel.addEventListener("change", update);
+    return () => sel.removeEventListener("change", update);
+  }, []);
+  const pool = useMemo(() => {
+    const ids = itemsByWh && formWh ? new Set(itemsByWh[formWh] ?? []) : null;
+    return ids && !allItems ? items.filter((i) => ids.has(i.id)) : items;
+  }, [items, itemsByWh, formWh, allItems]);
+  const hiddenCount = items.length - pool.length;
+  const sorted = useMemo(() => [...pool].sort(byCode), [pool]);
 
-  const chosen = sorted.find((i) => label(i) === value || i.code.toLowerCase() === value.trim().toLowerCase() || (i.barcode && i.barcode === value.trim()));
+  const chosen = items.find((i) => label(i) === value || i.code.toLowerCase() === value.trim().toLowerCase() || (i.barcode && i.barcode === value.trim()));
   // Nothing typed or an item already chosen: the whole list in code order. Otherwise: search results.
-  const shown = !value.trim() || chosen ? sorted : searchItems(items, value, 50);
+  const shown = !value.trim() || (chosen && sorted.includes(chosen)) ? sorted : searchItems(chosen ? items : pool, value, 50);
 
   function openList() {
     setOpen(true);
@@ -116,6 +136,17 @@ export function ItemPicker({ name, items, required }: { name: string; items: Pic
               <span className="ml-auto text-xs text-slate-400">{it.unit}</span>
             </li>
           ))}
+          {hiddenCount > 0 && (
+            <li
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setAllItems(true);
+              }}
+              className="cursor-pointer border-t border-slate-100 px-3 py-1.5 text-xs text-teal-700 hover:bg-slate-50"
+            >
+              顯示全部品項（另有 {hiddenCount} 項其他單位的品項）
+            </li>
+          )}
         </ul>
       )}
     </div>
