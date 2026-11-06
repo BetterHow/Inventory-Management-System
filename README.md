@@ -41,7 +41,12 @@ npm run dev                   # http://localhost:3000
 
 ## 部署（雲端）
 
-1. 建一個 PostgreSQL 資料庫（例如 Neon 或 Supabase），取得連線字串。
-2. 在 Vercel 匯入這個 repo，設定環境變數 `DATABASE_URL`、`AUTH_SECRET`（一串長亂碼）。
-3. 第一次部署後，在本機用正式的 `DATABASE_URL` 執行 `npx prisma migrate deploy` 與 `npm run db:seed`。
-4. 用 `admin` 和 `SEED_ADMIN_PASSWORD` 登入，到「使用者」建立其他人員帳號。
+建議：Vercel（網站，Pro 方案）＋ Neon（PostgreSQL，從 Vercel Marketplace 加入，區域選 Singapore）。
+
+1. 用診所專用的 email 註冊 Vercel，升級 Pro。
+2. 在 Vercel 的 Storage／Marketplace 加入 Neon，會自動設定 `DATABASE_URL` 與 `DATABASE_URL_UNPOOLED`。
+3. 匯入這個 GitHub repo，另外設定環境變數：
+   - `AUTH_SECRET`：一串長亂碼（例如 `openssl rand -base64 32` 的結果）
+   - `SEED_ADMIN_PASSWORD`：第一個管理員 `admin` 的密碼（至少 8 字元）
+4. 部署。每次部署會自動執行 `vercel-build`：建立／更新資料表，第一次部署時建立 admin 帳號與預設庫別、類別。
+5. 用 `admin` 登入，到「系統設定」改診所名稱，到「使用者」建立人員帳號。

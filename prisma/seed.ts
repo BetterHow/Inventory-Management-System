@@ -1,18 +1,19 @@
 // First-time setup: one admin account, a default warehouse and categories.
-// Run with `npm run db:seed`. Safe to run again; existing data is kept.
+// Runs on every Vercel deploy (see vercel-build) and with `npm run db:seed`. Existing data is kept.
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const password = process.env.SEED_ADMIN_PASSWORD;
-  if (!password || password.length < 8) throw new Error("Set SEED_ADMIN_PASSWORD (8+ characters) before seeding");
-  await prisma.user.upsert({
-    where: { username: "admin" },
-    update: {},
-    create: { username: "admin", name: "管理員", role: "ADMIN", passwordHash: await bcrypt.hash(password, 10) },
-  });
+  // Only creates the admin the first time; later runs (every deploy) leave it alone.
+  if (!(await prisma.user.findUnique({ where: { username: "admin" } }))) {
+    const password = process.env.SEED_ADMIN_PASSWORD;
+    if (!password || password.length < 8) throw new Error("Set SEED_ADMIN_PASSWORD (8+ characters) before the first deploy");
+    await prisma.user.create({
+      data: { username: "admin", name: "管理員", role: "ADMIN", passwordHash: await bcrypt.hash(password, 10) },
+    });
+  }
   const warehouses = [
     { code: "PH", name: "藥局", sortOrder: 1 },
     { code: "NS", name: "護理部", sortOrder: 2 },
