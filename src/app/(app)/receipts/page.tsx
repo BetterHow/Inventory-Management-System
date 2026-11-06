@@ -23,13 +23,15 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
   const status = sp.status as ReceiptStatus | undefined;
   const q = sp.q?.trim();
 
+  const byInvoice = sp.dateBy === "invoice";
+  const range = sp.from || sp.to
+    ? { ...(sp.from ? { gte: new Date(sp.from + "T00:00:00Z") } : {}), ...(sp.to ? { lte: new Date(sp.to + "T00:00:00Z") } : {}) }
+    : undefined;
   const where: Prisma.ReceiptWhereInput = {
     ...(wid ? { warehouseId: wid } : {}),
     ...(status ? { status } : {}),
     ...(sp.supplier ? { supplierId: Number(sp.supplier) } : {}),
-    ...(sp.from || sp.to
-      ? { date: { ...(sp.from ? { gte: new Date(sp.from + "T00:00:00Z") } : {}), ...(sp.to ? { lte: new Date(sp.to + "T00:00:00Z") } : {}) } }
-      : {}),
+    ...(range ? (byInvoice ? { invoice: { date: range } } : { date: range }) : {}),
     ...(sp.invoice === "none" ? { invoiceId: null } : {}),
     ...(sp.invoice === "unpaid" ? { invoice: { paid: false } } : {}),
     ...(sp.invoice === "paid" ? { invoice: { paid: true } } : {}),
@@ -39,6 +41,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
           OR: [
             { number: { contains: q, mode: "insensitive" } },
             { note: { contains: q, mode: "insensitive" } },
+            { invoice: { number: { contains: q, mode: "insensitive" } } },
             { lines: { some: { item: { OR: [{ name: { contains: q, mode: "insensitive" } }, { code: { contains: q, mode: "insensitive" } }] } } } },
           ],
         }
@@ -52,7 +55,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
   });
   const whName = new Map((await prisma.warehouse.findMany()).map((w) => [w.id, w.name]));
   const total = receipts.filter((r) => r.status !== "CANCELLED").reduce((s, r) => s + num(r.totalAmount), 0);
-  const filtering = Boolean(sp.supplier || sp.from || sp.to || sp.invoice || sp.category || q);
+  const filtering = Boolean(sp.supplier || sp.from || sp.to || sp.dateBy || sp.invoice || sp.category || q);
   const statusTabs: [string, string][] = [["", "全部狀態"], ["ORDERED", "待入庫"], ["PENDING_INSPECTION", "待驗收"], ["RECEIVED", "已入庫"], ["CANCELLED", "已取消"]];
 
   return (
@@ -86,15 +89,21 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
             {Object.entries(INVOICE_FILTER).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </Field>
+        <Field label="日期依據" className="w-32">
+          <select name="dateBy" defaultValue={sp.dateBy ?? ""} className="input">
+            <option value="">進貨日期</option>
+            <option value="invoice">發票日期</option>
+          </select>
+        </Field>
         <Field label="日期從" className="w-40"><input type="date" name="from" defaultValue={sp.from ?? ""} className="input" /></Field>
         <Field label="到" className="w-40"><input type="date" name="to" defaultValue={sp.to ?? ""} className="input" /></Field>
-        <Field label="關鍵字" className="w-48"><input name="q" defaultValue={q ?? ""} placeholder="單號、品名、備註" className="input" /></Field>
+        <Field label="關鍵字" className="w-48"><input name="q" defaultValue={q ?? ""} placeholder="單號、發票號、品名、備註" className="input" /></Field>
       </AutoForm>
 
       <div className="card overflow-x-auto p-0">
         {receipts.length === 0 ? <Empty>沒有符合的進貨單</Empty> : (
           <table className="table">
-            <thead><tr><th>單號</th><th>日期</th><th>供應商</th>{!wid && <th>庫別</th>}<th>狀態</th><th className="num">金額</th><th>發票</th><th>付款</th></tr></thead>
+            <thead><tr><th>單號</th><th>進貨日期</th><th>供應商</th>{!wid && <th>庫別</th>}<th>狀態</th><th className="num">金額</th><th>發票</th><th>發票日期</th><th>付款</th></tr></thead>
             <tbody>
               {receipts.map((r) => (
                 <tr key={r.id}>
@@ -105,6 +114,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
                   <td><span className={`badge ${STATUS_COLOR[r.status]}`}>{RECEIPT_STATUS_LABEL[r.status]}</span></td>
                   <td className="num">{fmtMoney(r.totalAmount)}</td>
                   <td>{r.invoice ? <Link href={`/invoices/${r.invoice.id}`} className="btn-link">{r.invoice.number}</Link> : <span className="text-slate-400">未對發票</span>}</td>
+                  <td>{r.invoice ? fmtDate(r.invoice.date, true) : ""}</td>
                   <td>{r.invoice ? (r.invoice.paid ? "已付" : <span className="text-amber-700">未付</span>) : ""}</td>
                 </tr>
               ))}

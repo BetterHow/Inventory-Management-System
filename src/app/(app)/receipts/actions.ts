@@ -66,7 +66,7 @@ async function maybeInvoice(tx: Tx, fd: FormData, supplierId: number, receiptId:
   const inv = await tx.invoice.create({
     data: {
       number,
-      date: dateOnly(str(fd, "invoiceDate") || todayTaipei()),
+      date: dateOnly(str(fd, "invoiceDate") || str(fd, "date") || todayTaipei()),
       supplierId,
       amount: optNum(fd, "invoiceAmount") ?? total,
       taxAmount: optNum(fd, "invoiceTax"),

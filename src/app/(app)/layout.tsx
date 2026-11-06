@@ -19,7 +19,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Suspense fallback={null}><NavProgress /></Suspense>
       <Sidebar userName={user.name} isAdmin={user.role === "ADMIN"} clinicName={settings.clinicName} logout={logout} initialCollapsed={collapsed}
         unit={unit ?? null} units={warehouses.map((w) => ({ id: w.id, name: w.name }))} />
-      <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
+      {/* keyed by unit so a half-filled form starts over with the new unit's defaults */}
+      <main key={unit ?? "all"} className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
     </div>
   );
 }

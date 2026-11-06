@@ -46,11 +46,11 @@ export function ReceiptForm({ receipt, suppliers, warehouses, items, inspectionE
       <p className="text-xs text-slate-500">金額預設為數量×單價，可直接改成發票上的金額。系統不會自動加稅。</p>
 
       {!receipt && (
-        <details className="rounded-md border border-slate-200 p-3">
-          <summary className="cursor-pointer text-sm font-medium">發票（每次進貨就開發票時填；月結的到「發票」頁合併）</summary>
+        <details open className="rounded-md border border-slate-200 p-3">
+          <summary className="cursor-pointer text-sm font-medium">發票（隨貨附發票就在這裡填；沒有發票或月結的，之後到「發票」頁對帳）</summary>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Field label="發票號碼"><input name="invoiceNumber" className="input" placeholder="AB12345678" /></Field>
-            <Field label="發票日期"><input type="date" name="invoiceDate" className="input" /></Field>
+            <Field label="發票日期（空白=進貨日期）"><input type="date" name="invoiceDate" className="input" /></Field>
             <Field label="發票金額（空白=明細合計）"><input type="number" step="0.01" name="invoiceAmount" className="input" /></Field>
             <Field label="其中稅額（選填）"><input type="number" step="0.01" name="invoiceTax" className="input" /></Field>
           </div>
