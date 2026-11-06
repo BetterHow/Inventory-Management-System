@@ -51,8 +51,12 @@ export function LineEditor({
   const [lines, setLines] = useState<Line[]>(initial);
   const [query, setQuery] = useState("");
   const [msg, setMsg] = useState("");
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+
+  const matches = useMemo(() => searchItems(items, query), [items, query]);
 
   function find(q: string): PickItem | undefined {
     const s = q.trim().toLowerCase();
@@ -61,18 +65,19 @@ export function LineEditor({
       (i) => i.barcode?.toLowerCase() === s || i.code.toLowerCase() === s || i.nhiCode?.toLowerCase() === s || label(i).toLowerCase() === s,
     );
     if (exact) return exact;
-    const partial = items.filter((i) => i.name.toLowerCase().includes(s) || i.code.toLowerCase().includes(s));
+    const partial = searchItems(items, q);
     return partial.length === 1 ? partial[0] : undefined;
   }
 
-  function add() {
-    const it = find(query);
+  function add(picked?: PickItem) {
+    const it = picked ?? find(query);
     if (!it) {
-      setMsg(`找不到「${query}」，或符合的品項不只一個，請從清單選擇`);
+      setMsg(query.trim() ? `找不到「${query}」，或符合的品項不只一個，請從清單選擇` : "");
       return;
     }
     setMsg("");
     setQuery("");
+    setOpen(false);
     // Scanning the same item again in consumption adds one more instead of a new row.
     const idx = lines.findIndex((l) => l.itemId === it.id);
     if (idx >= 0 && (mode === "consume" || mode === "transfer")) {
@@ -107,23 +112,63 @@ export function LineEditor({
     <div>
       <input type="hidden" name="lines" value={JSON.stringify(lines)} />
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input
-          list="item-options"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-          placeholder="掃條碼，或輸入料號／品名後按 Enter"
-          className="input max-w-md"
-        />
-        <button type="button" className="btn-secondary" onClick={add}>加入</button>
-        <datalist id="item-options">
-          {items.map((i) => <option key={i.id} value={label(i)} />)}
-        </datalist>
+        <div className="relative w-full max-w-md">
+          <input
+            value={query}
+            autoComplete="off"
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+              setHi(0);
+              setMsg("");
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            onKeyDown={(e) => {
+              const showing = open && matches.length > 0;
+              if (e.key === "ArrowDown" && showing) {
+                e.preventDefault();
+                setHi((hi + 1) % matches.length);
+              } else if (e.key === "ArrowUp" && showing) {
+                e.preventDefault();
+                setHi((hi - 1 + matches.length) % matches.length);
+              } else if (e.key === "Escape") {
+                setOpen(false);
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                // A scanned barcode or exact code wins; otherwise take the highlighted suggestion.
+                add(find(query) ?? (showing ? matches[hi] : undefined));
+              }
+            }}
+            placeholder="掃條碼，或輸入料號／品名／健保碼"
+            className="input"
+          />
+          {open && query.trim() !== "" && (
+            <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg">
+              {matches.length === 0 && <li className="px-3 py-2 text-slate-400">沒有符合的品項</li>}
+              {matches.map((it, i) => (
+                <li
+                  key={it.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    add(it);
+                  }}
+                  onMouseEnter={() => setHi(i)}
+                  className={`flex cursor-pointer items-baseline justify-between gap-3 px-3 py-1.5 ${i === hi ? "bg-teal-50" : ""}`}
+                >
+                  <span>
+                    <span className="font-medium">{it.name}</span>
+                    <span className="ml-2 text-xs text-slate-400">{it.code}{it.nhiCode ? ` · ${it.nhiCode}` : ""}</span>
+                  </span>
+                  {warehouseId !== undefined && (mode === "consume" || mode === "transfer") && (
+                    <span className="shrink-0 text-xs text-slate-500">庫存 {stock[`${warehouseId}:${it.id}`] ?? 0} {it.unit}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <button type="button" className="btn-secondary" onClick={() => add(find(query) ?? matches[hi])}>加入</button>
         {msg && <span className="text-sm text-rose-600">{msg}</span>}
       </div>
 
@@ -236,6 +281,33 @@ export function LineEditor({
       </div>
     </div>
   );
+}
+
+/**
+ * Items that match what was typed, best first: exact code/barcode, then codes and names that start
+ * with it, then anything containing it. Several words must all match (e.g. "口罩 L").
+ */
+export function searchItems(items: PickItem[], q: string, limit = 12): PickItem[] {
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  const first = words[0];
+  const scored: { it: PickItem; score: number }[] = [];
+  for (const it of items) {
+    const code = it.code.toLowerCase();
+    const name = it.name.toLowerCase();
+    const extra = [it.barcode, it.nhiCode].filter(Boolean).join(" ").toLowerCase();
+    const hay = `${code} ${name} ${extra}`;
+    if (!words.every((w) => hay.includes(w))) continue;
+    let score = 5;
+    if (code === first || it.barcode?.toLowerCase() === first || it.nhiCode?.toLowerCase() === first) score = 0;
+    else if (code.startsWith(first)) score = 1;
+    else if (name.startsWith(first)) score = 2;
+    else if (name.includes(first)) score = 3;
+    else if (code.includes(first)) score = 4;
+    scored.push({ it, score });
+  }
+  scored.sort((a, b) => a.score - b.score || a.it.code.localeCompare(b.it.code));
+  return scored.slice(0, limit).map((s) => s.it);
 }
 
 function label(i: PickItem) {

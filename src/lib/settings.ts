@@ -7,6 +7,7 @@ export type AppSettings = {
   expiryDangerDays: number;
   usageDays: number; // 自動安全量參考的耗用天數
   clinicName: string;
+  consumptionNotes: string[]; // 耗用備註的常用選項
 };
 
 const DEFAULTS: AppSettings = {
@@ -15,6 +16,7 @@ const DEFAULTS: AppSettings = {
   expiryDangerDays: 30,
   usageDays: 90,
   clinicName: "診所",
+  consumptionNotes: ["門診扣庫", "各單位領用", "贈送", "損耗", "過期報廢"],
 };
 
 export async function getSettings(): Promise<AppSettings> {
@@ -26,12 +28,18 @@ export async function getSettings(): Promise<AppSettings> {
     expiryDangerDays: Number(map.get("expiryDangerDays") ?? DEFAULTS.expiryDangerDays),
     usageDays: Number(map.get("usageDays") ?? DEFAULTS.usageDays),
     clinicName: map.get("clinicName") ?? DEFAULTS.clinicName,
+    consumptionNotes: map.has("consumptionNotes") ? splitLines(map.get("consumptionNotes")!) : DEFAULTS.consumptionNotes,
   };
 }
 
 export async function saveSettings(s: AppSettings) {
-  const entries = Object.entries(s).map(([key, value]) => ({ key, value: String(value) }));
+  const entries = Object.entries(s).map(([key, value]) => ({ key, value: Array.isArray(value) ? value.join("\n") : String(value) }));
   await prisma.$transaction(
     entries.map((e) => prisma.setting.upsert({ where: { key: e.key }, create: e, update: { value: e.value } })),
   );
+}
+
+/** One option per line; blank lines and repeats are dropped. */
+export function splitLines(text: string): string[] {
+  return [...new Set(text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean))];
 }
