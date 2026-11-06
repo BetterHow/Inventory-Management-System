@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { PageHeader, Field, CancelLink } from "@/components/ui";
+import { AutoForm } from "@/components/AutoForm";
+
 import { Flash } from "@/components/Flash";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { todayTaipei } from "@/lib/logic";
@@ -19,16 +21,15 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
     <div className="max-w-3xl">
       <PageHeader title="新增發票" />
       <Flash sp={sp} />
-      <form className="card mb-4 flex items-end gap-2">
+      <AutoForm className="card mb-4 flex items-end gap-2">
         <Field label="1. 先選供應商" className="flex-1">
           <select name="supplier" defaultValue={supplierId ?? ""} className="input">
             <option value="">請選擇</option>
             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </Field>
-        <button className="btn-secondary">下一步</button>
         {!supplierId && <CancelLink href="/invoices" />}
-      </form>
+      </AutoForm>
       {supplierId && (
         <form action={createInvoice} className="card space-y-4">
           <input type="hidden" name="supplierId" value={supplierId} />

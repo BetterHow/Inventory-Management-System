@@ -7,6 +7,9 @@ import { attempt } from "@/lib/action";
 import { UserError, bool, str } from "@/lib/form";
 import { PageHeader } from "@/components/ui";
 import { Flash } from "@/components/Flash";
+import { activeWarehouses } from "@/lib/pickers";
+
+const whVal = (fd: FormData) => (Number(fd.get("defaultWarehouseId")) > 0 ? Number(fd.get("defaultWarehouseId")) : null);
 
 async function addUser(fd: FormData) {
   "use server";
@@ -18,7 +21,7 @@ async function addUser(fd: FormData) {
     if (!username || !name) throw new UserError("帳號與姓名必填");
     if (password.length < 8) throw new UserError("密碼至少 8 個字元");
     await prisma.user.create({
-      data: { username, name, role: str(fd, "role") === "ADMIN" ? "ADMIN" : "STAFF", passwordHash: await bcrypt.hash(password, 10) },
+      data: { username, name, defaultWarehouseId: whVal(fd), role: str(fd, "role") === "ADMIN" ? "ADMIN" : "STAFF", passwordHash: await bcrypt.hash(password, 10) },
     });
   });
   revalidatePath("/users");
@@ -39,6 +42,7 @@ async function saveUser(id: number, fd: FormData) {
       data: {
         name: str(fd, "name"),
         role,
+        defaultWarehouseId: whVal(fd),
         active,
         ...(password ? { passwordHash: await bcrypt.hash(password, 10) } : {}),
       },
@@ -51,10 +55,17 @@ async function saveUser(id: number, fd: FormData) {
 export default async function UsersPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   await requireAdmin();
   const sp = await searchParams;
-  const users = await prisma.user.findMany({ orderBy: { id: "asc" } });
+  const [users, warehouses] = await Promise.all([prisma.user.findMany({ orderBy: { id: "asc" } }), activeWarehouses()]);
+  const whSelect = (v?: number | null) => (
+    <select name="defaultWarehouseId" defaultValue={v ?? ""} className="input w-36" title="負責庫別：列表預設只顯示這個庫別">
+      <option value="">負責庫別：全部</option>
+      {warehouses.map((w) => <option key={w.id} value={w.id}>負責：{w.name}</option>)}
+    </select>
+  );
   return (
     <div className="max-w-4xl">
       <PageHeader title="使用者" />
+      <p className="mb-3 text-sm text-slate-500">「負責庫別」設定後，這個人打開進貨單、耗用紀錄、庫存總覽時，會先只看到自己的庫別，新增單據也會預設這個庫別（需要時仍可切換到其他庫別）。</p>
       <Flash sp={sp} />
       <div className="card space-y-2">
         {users.map((u) => (
@@ -65,6 +76,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               <option value="STAFF">一般人員</option>
               <option value="ADMIN">管理員</option>
             </select>
+            {whSelect(u.defaultWarehouseId)}
             <input name="password" type="password" placeholder="新密碼（不改留空）" className="input w-44" autoComplete="new-password" />
             <label className="flex items-center gap-1 text-sm"><input type="checkbox" name="active" defaultChecked={u.active} /> 啟用</label>
             <button className="btn-secondary">儲存</button>
@@ -77,6 +89,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             <option value="STAFF">一般人員</option>
             <option value="ADMIN">管理員</option>
           </select>
+          {whSelect()}
           <input name="password" type="password" placeholder="密碼（至少8字元）" className="input w-44" autoComplete="new-password" />
           <button className="btn">新增</button>
         </form>

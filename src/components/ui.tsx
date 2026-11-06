@@ -63,6 +63,48 @@ export function Notice({ kind = "info", children }: { kind?: "info" | "warn" | "
   return <div className={`mb-4 rounded-md border px-3 py-2 text-sm ${color}`}>{children}</div>;
 }
 
+/** Builds a link to the same page with some search params changed (empty value = removed). */
+export function withParams(path: string, sp: Record<string, string | undefined>, changes: Record<string, string | undefined>) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries({ ...sp, ...changes })) if (v && !["ok", "error", "warn"].includes(k)) q.set(k, v);
+  const s = q.toString();
+  return s ? `${path}?${s}` : path;
+}
+
+/** Pill-shaped filter links, e.g. warehouses or statuses. */
+export function Pills({ items }: { items: { href: string; label: string; active: boolean }[] }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {items.map((it) => (
+        <Link key={it.href + it.label} href={it.href}
+          className={`rounded-full px-3 py-1 text-sm ${it.active ? "bg-teal-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
+          {it.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/** Warehouse pills for list pages. "全部庫別" passes warehouse=all so the user's own warehouse isn't re-applied. */
+export function WarehousePills({ path, sp, warehouses, current, mine }: {
+  path: string;
+  sp: Record<string, string | undefined>;
+  warehouses: { id: number; name: string }[];
+  current: number | undefined;
+  mine?: number | null;
+}) {
+  return (
+    <Pills items={[
+      { href: withParams(path, sp, { warehouse: "all" }), label: "全部庫別", active: current === undefined },
+      ...warehouses.map((w) => ({
+        href: withParams(path, sp, { warehouse: String(w.id) }),
+        label: w.id === mine ? `${w.name}（我的）` : w.name,
+        active: current === w.id,
+      })),
+    ]} />
+  );
+}
+
 export function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <label className={`block ${className ?? ""}`}>

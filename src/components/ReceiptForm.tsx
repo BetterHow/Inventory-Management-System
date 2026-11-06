@@ -4,7 +4,8 @@ import { LineEditor, type PickItem, type Line } from "./LineEditor";
 import { fmtDate, num } from "@/lib/format";
 import { todayTaipei } from "@/lib/logic";
 
-export function ReceiptForm({ receipt, suppliers, warehouses, items, inspectionEnabled, action }: {
+export function ReceiptForm({ receipt, suppliers, warehouses, items, inspectionEnabled, action, defaultWarehouseId }: {
+  defaultWarehouseId?: number | null;
   receipt?: Receipt & { lines: ReceiptLine[] };
   suppliers: Supplier[];
   warehouses: Warehouse[];
@@ -33,7 +34,7 @@ export function ReceiptForm({ receipt, suppliers, warehouses, items, inspectionE
           </select>
         </Field>
         <Field label="入庫庫別">
-          <select name="warehouseId" defaultValue={receipt?.warehouseId} className="input">
+          <select name="warehouseId" defaultValue={receipt?.warehouseId ?? defaultWarehouseId ?? undefined} className="input">
             {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
         </Field>

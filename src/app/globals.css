@@ -57,3 +57,16 @@ body {
     @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
   }
 }
+
+/* Page-loading feedback (see NavProgress) */
+@keyframes nav-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+.nav-progress {
+  animation: nav-progress 1s ease-in-out infinite;
+}
+body[data-navigating] main {
+  opacity: 0.55;
+  transition: opacity 150ms 150ms;
+}

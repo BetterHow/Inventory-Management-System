@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AutoForm } from "@/components/AutoForm";
 import { prisma } from "@/lib/db";
 import { PageHeader, LinkButton, Empty } from "@/components/ui";
 import { Flash } from "@/components/Flash";
@@ -32,7 +33,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: SP }) 
         <LinkButton href="/items/new">＋ 新增品項</LinkButton>
       </PageHeader>
       <Flash sp={sp} />
-      <form className="mb-4 flex flex-wrap items-end gap-2">
+      <AutoForm className="mb-4 flex flex-wrap items-end gap-2">
         <input name="q" defaultValue={q} placeholder="搜尋料號、品名、健保碼、條碼" className="input max-w-xs" />
         <select name="cat" defaultValue={sp.cat ?? ""} className="input max-w-[10rem]">
           <option value="">全部類別</option>
@@ -41,8 +42,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: SP }) 
         <label className="flex items-center gap-1 text-sm">
           <input type="checkbox" name="inactive" value="1" defaultChecked={showInactive} /> 含停用
         </label>
-        <button className="btn-secondary">搜尋</button>
-      </form>
+      </AutoForm>
       <div className="card overflow-x-auto p-0">
         {items.length === 0 ? (
           <Empty>還沒有品項</Empty>

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { SIDEBAR_COOKIE } from "@/lib/prefs";
 
@@ -61,7 +61,11 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
     setCollapsed(next);
     document.cookie = `${SIDEBAR_COOKIE}=${next ? "collapsed" : "open"}; path=/; max-age=31536000; samesite=lax`;
   }
-  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  // Highlight the clicked item right away, before the next page has finished loading.
+  const [clicked, setClicked] = useState<string | null>(null);
+  useEffect(() => setClicked(null), [path]);
+  const matches = (href: string, p: string) => (href === "/" ? p === "/" : p.startsWith(href));
+  const active = (href: string) => (clicked ? clicked === href : matches(href, path));
 
   return (
     <>
@@ -104,7 +108,10 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
                     key={l.href}
                     href={l.href}
                     title={l.label}
-                    onClick={() => setOpen(false)}
+                    onClick={() => {
+                      setOpen(false);
+                      if (!matches(l.href, path)) setClicked(l.href);
+                    }}
                     className={`block rounded-md px-3 py-1.5 text-sm ${collapsed ? "md:px-0 md:text-center" : ""} ${
                       active(l.href) ? "bg-teal-600 text-white" : "hover:bg-slate-700"
                     }`}
