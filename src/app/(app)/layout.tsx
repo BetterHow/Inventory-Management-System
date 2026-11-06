@@ -6,8 +6,7 @@ import { logout } from "../login/actions";
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser();
-  const settings = await getSettings();
+  const [user, settings] = await Promise.all([requireUser(), getSettings()]);
   return (
     <div className="md:flex">
       <Sidebar userName={user.name} isAdmin={user.role === "ADMIN"} clinicName={settings.clinicName} logout={logout} />
