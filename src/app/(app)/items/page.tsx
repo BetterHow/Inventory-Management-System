@@ -30,6 +30,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: SP }) 
   return (
     <div>
       <PageHeader title="品項">
+        <LinkButton href="/items/prices" secondary>健保價更新</LinkButton>
         <LinkButton href="/items/new">＋ 新增品項</LinkButton>
       </PageHeader>
       <Flash sp={sp} />

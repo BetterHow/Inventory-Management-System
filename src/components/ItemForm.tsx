@@ -1,6 +1,7 @@
 import type { Item, Category, Supplier } from "@prisma/client";
 import { Field, CancelLink } from "./ui";
-import { num } from "@/lib/format";
+import { num, fmtDate } from "@/lib/format";
+import { PriceFields } from "./PriceFields";
 
 export function ItemForm({ item, categories, suppliers, action, cancelHref = "/items" }: {
   item?: Item;
@@ -26,9 +27,6 @@ export function ItemForm({ item, categories, suppliers, action, cancelHref = "/i
       <Field label="參考單價（含稅）">
         <input name="refPrice" type="number" step="0.01" className="input" defaultValue={item?.refPrice ? num(item.refPrice) : ""} />
       </Field>
-      <Field label="健保價／售價（每單位）">
-        <input name="salePrice" type="number" step="0.01" className="input" defaultValue={item?.salePrice ? num(item.salePrice) : ""} placeholder="用來算價差，可留空" />
-      </Field>
       <Field label="預設供應商">
         <select name="defaultSupplierId" className="input" defaultValue={item?.defaultSupplierId ?? ""}>
           <option value="">（無）</option>
@@ -36,6 +34,13 @@ export function ItemForm({ item, categories, suppliers, action, cancelHref = "/i
         </select>
       </Field>
       <Field label="備註"><input name="note" className="input" defaultValue={item?.note ?? ""} /></Field>
+      <PriceFields
+        source={item?.priceSource ?? (item?.nhiCode ? "NHI" : "MANUAL")}
+        salePrice={item?.salePrice == null ? null : num(item.salePrice)}
+        nhiPrice={item?.nhiPrice == null ? null : num(item.nhiPrice)}
+        nhiPriceFrom={item?.nhiPriceFrom ? fmtDate(item.nhiPriceFrom, true) : null}
+        nhiCheckedAt={item?.nhiCheckedAt ? fmtDate(item.nhiCheckedAt, true) : null}
+      />
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="trackBatch" defaultChecked={item?.trackBatch ?? true} /> 管理批號與效期
       </label>

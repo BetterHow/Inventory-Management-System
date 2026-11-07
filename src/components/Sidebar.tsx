@@ -103,6 +103,13 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
   }
   // Highlight the clicked item right away, before the next page has finished loading.
   const [clicked, setClicked] = useState<string | null>(null);
+  // Folded sidebar: show the page name right away on hover (the browser's own tooltip waits ~1s).
+  const [tip, setTip] = useState<{ label: string; top: number; left: number } | null>(null);
+  function showTip(e: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, label: string) {
+    if (!collapsed || window.innerWidth < 768) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ label, top: r.top + r.height / 2, left: r.right + 10 });
+  }
   useEffect(() => setClicked(null), [path]);
   const matches = (href: string, p: string) => (href === "/" ? p === "/" : p.startsWith(href));
   const active = (href: string) => (clicked ? clicked === href : matches(href, path));
@@ -177,8 +184,14 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
                       <Link
                         key={l.href}
                         href={l.href}
-                        title={l.label}
+                        title={collapsed ? undefined : l.label}
+                        aria-label={l.label}
+                        onMouseEnter={(e) => showTip(e, l.label)}
+                        onMouseLeave={() => setTip(null)}
+                        onFocus={(e) => showTip(e, l.label)}
+                        onBlur={() => setTip(null)}
                         onClick={() => {
+                          setTip(null);
                           setOpen(false);
                           if (!matches(l.href, path)) setClicked(l.href);
                         }}
@@ -215,6 +228,16 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
           </div>
         </div>
       </aside>
+      {tip && (
+        <div
+          role="tooltip"
+          className="pointer-events-none fixed z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg dark:bg-slate-100 dark:text-slate-900"
+          style={{ top: tip.top, left: tip.left }}
+        >
+          <span className="absolute -left-1 top-1/2 size-2 -translate-y-1/2 rotate-45 bg-inherit" />
+          {tip.label}
+        </div>
+      )}
     </>
   );
 }

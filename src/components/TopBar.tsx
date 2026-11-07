@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { ChevronRight, Home } from "lucide-react";
 import { NAV } from "./Sidebar";
 
-const SUB: Record<string, string> = { new: "新增", edit: "編輯" };
+const SUB: Record<string, string> = { new: "新增", edit: "編輯", prices: "健保價更新" };
 
 /** Top strip on every page: a breadcrumb that always starts with 首頁, plus today's date. */
 export function TopBar({ today }: { today: string }) {

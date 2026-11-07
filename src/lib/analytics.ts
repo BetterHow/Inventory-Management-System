@@ -3,9 +3,14 @@ import { prisma } from "./db";
 import { num } from "./format";
 import { parseTaipeiDate, taipeiParts, todayTaipei } from "./logic";
 
-/** Consumption with these notes earns nothing, so it is left out of 售價 and 價差 (its cost still counts). */
-export const NO_REVENUE = ["贈送", "損耗"];
-const noRevenue = (note: string | null | undefined) => Boolean(note && NO_REVENUE.some((w) => note.includes(w)));
+import { getSettings } from "./settings";
+import { priceLookup } from "./prices";
+
+/** Consumption whose note has one of these words (系統設定) earns nothing: cost only, no 售價. */
+async function noRevenueTest() {
+  const words = (await getSettings()).noRevenueNotes;
+  return { words, test: (note: string | null | undefined) => Boolean(note && words.some((w) => note.includes(w))) };
+}
 
 export type Period = { key: string; label: string; from: string; to: string };
 
@@ -57,12 +62,13 @@ export function resolvePeriod(sp: Record<string, string | undefined>): { cur: Pe
   return { cur, prev };
 }
 
-type Totals = { cost: number; sale: number; margin: number; pricedCost: number; noRevenueCost: number; received: number };
+/** margin = 售價 − 成本 of the priced, earning consumption; net = margin − 贈送／損耗成本. */
+type Totals = { cost: number; sale: number; margin: number; net: number; pricedCost: number; noRevenueCost: number; received: number };
 
 export type ItemRow = { id: number; code: string; name: string; unit: string; qty: number; cost: number; sale: number; margin: number; priced: boolean };
 export type CatRow = { name: string; cost: number; sale: number; margin: number };
 export type PurposeRow = { name: string; cost: number; sale: number; margin: number; revenue: boolean };
-export type MonthRow = { key: string; label: string; cost: number; sale: number; margin: number; received: number };
+export type MonthRow = { key: string; label: string; cost: number; sale: number; margin: number; net: number; received: number };
 
 const end = (to: string) => new Date(parseTaipeiDate(to).getTime() + 86400000 - 1);
 
@@ -90,21 +96,26 @@ async function receivedTotal(from: string, to: string, wid?: number) {
 }
 
 export async function analytics(cur: Period, prev: Period, wid?: number) {
-  const items = await prisma.item.findMany({ include: { category: true } });
+  const [items, priceAt, { words, test: noRevenue }] = await Promise.all([
+    prisma.item.findMany({ include: { category: true } }),
+    priceLookup(),
+    noRevenueTest(),
+  ]);
   const itemMap = new Map(items.map((i) => [i.id, i]));
 
   function summarize(rows: Awaited<ReturnType<typeof consumption>>, received: number): Totals {
-    const t: Totals = { cost: 0, sale: 0, margin: 0, pricedCost: 0, noRevenueCost: 0, received };
+    const t: Totals = { cost: 0, sale: 0, margin: 0, net: 0, pricedCost: 0, noRevenueCost: 0, received };
     for (const r of rows) {
       t.cost += r.cost;
-      const price = itemMap.get(r.itemId)?.salePrice;
+      const price = priceAt(r.itemId, r.date);
       if (noRevenue(r.note)) t.noRevenueCost += r.cost;
       else if (price != null) {
-        t.sale += r.qty * num(price);
+        t.sale += r.qty * price;
         t.pricedCost += r.cost;
       }
     }
     t.margin = t.sale - t.pricedCost;
+    t.net = t.margin - t.noRevenueCost;
     return t;
   }
 
@@ -124,9 +135,10 @@ export async function analytics(cur: Period, prev: Period, wid?: number) {
   for (const r of curRows) {
     const it = itemMap.get(r.itemId);
     if (!it) continue;
-    const priced = it.salePrice != null;
+    const price = priceAt(it.id, r.date);
+    const priced = price != null;
     const earns = priced && !noRevenue(r.note);
-    const sale = earns ? r.qty * num(it.salePrice) : 0;
+    const sale = earns ? r.qty * price : 0;
     const margin = earns ? sale - r.cost : 0;
     const row = byItem.get(it.id) ?? { id: it.id, code: it.code, name: it.name, unit: it.unit, qty: 0, cost: 0, sale: 0, margin: 0, priced };
     row.qty += r.qty; row.cost += r.cost; row.sale += sale; row.margin += margin;
@@ -156,7 +168,7 @@ export async function analytics(cur: Period, prev: Period, wid?: number) {
   const months: MonthRow[] = [];
   for (let k = 0; k < 12; k++) {
     const p = addMonths(start.y, start.m, k);
-    months.push({ key: `${p.y}-${pad(p.m)}`, label: `${p.m}月`, cost: 0, sale: 0, margin: 0, received: 0 });
+    months.push({ key: `${p.y}-${pad(p.m)}`, label: `${p.m}月`, cost: 0, sale: 0, margin: 0, net: 0, received: 0 });
   }
   const idx = new Map(months.map((m, i) => [m.key, i]));
   for (const r of trendRows) {
@@ -164,10 +176,12 @@ export async function analytics(cur: Period, prev: Period, wid?: number) {
     const m = months[idx.get(`${p.y}-${pad(p.m)}`) ?? -1];
     if (!m) continue;
     m.cost += r.cost;
-    const price = itemMap.get(r.itemId)?.salePrice;
-    if (price != null && !noRevenue(r.note)) {
-      m.sale += r.qty * num(price);
-      m.margin += r.qty * num(price) - r.cost;
+    const price = priceAt(r.itemId, r.date);
+    if (noRevenue(r.note)) m.net -= r.cost;
+    else if (price != null) {
+      m.sale += r.qty * price;
+      m.margin += r.qty * price - r.cost;
+      m.net += r.qty * price - r.cost;
     }
   }
   for (const r of trendRec) {
@@ -176,6 +190,7 @@ export async function analytics(cur: Period, prev: Period, wid?: number) {
   }
 
   return {
+    noRevenueWords: words,
     totals,
     prevTotals,
     months,
@@ -189,15 +204,11 @@ export async function analytics(cur: Period, prev: Period, wid?: number) {
 
 /** 價差 for one period (used on the dashboard). */
 export async function periodMargin(from: string, to: string, wid?: number) {
-  const [rows, items] = await Promise.all([
-    consumption(from, to, wid),
-    prisma.item.findMany({ where: { salePrice: { not: null } }, select: { id: true, salePrice: true } }),
-  ]);
-  const price = new Map(items.map((i) => [i.id, num(i.salePrice)]));
+  const [rows, priceAt, { test: noRevenue }] = await Promise.all([consumption(from, to, wid), priceLookup(), noRevenueTest()]);
   let sale = 0, cost = 0;
   for (const r of rows) {
-    const p = price.get(r.itemId);
-    if (p === undefined || noRevenue(r.note)) continue;
+    const p = priceAt(r.itemId, r.date);
+    if (p === null || noRevenue(r.note)) continue;
     sale += r.qty * p;
     cost += r.cost;
   }

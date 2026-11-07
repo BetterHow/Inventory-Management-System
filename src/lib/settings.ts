@@ -8,6 +8,8 @@ export type AppSettings = {
   usageDays: number; // 自動安全量參考的耗用天數
   clinicName: string;
   consumptionNotes: string[]; // 耗用備註的常用選項
+  noRevenueNotes: string[]; // 這些用途的耗用不算售價（贈送、損耗⋯）
+  nhiPriceUrl: string; // 健保價格檔的下載網址
 };
 
 const DEFAULTS: AppSettings = {
@@ -17,6 +19,8 @@ const DEFAULTS: AppSettings = {
   usageDays: 90,
   clinicName: "診所",
   consumptionNotes: ["門診扣庫", "各單位領用", "贈送", "損耗", "過期報廢"],
+  noRevenueNotes: ["贈送", "損耗", "過期報廢"],
+  nhiPriceUrl: "",
 };
 
 export async function getSettings(): Promise<AppSettings> {
@@ -29,6 +33,8 @@ export async function getSettings(): Promise<AppSettings> {
     usageDays: Number(map.get("usageDays") ?? DEFAULTS.usageDays),
     clinicName: map.get("clinicName") ?? DEFAULTS.clinicName,
     consumptionNotes: map.has("consumptionNotes") ? splitLines(map.get("consumptionNotes")!) : DEFAULTS.consumptionNotes,
+    noRevenueNotes: map.has("noRevenueNotes") ? splitLines(map.get("noRevenueNotes")!) : DEFAULTS.noRevenueNotes,
+    nhiPriceUrl: map.get("nhiPriceUrl") ?? DEFAULTS.nhiPriceUrl,
   };
 }
 
@@ -42,4 +48,9 @@ export async function saveSettings(s: AppSettings) {
 /** One option per line; blank lines and repeats are dropped. */
 export function splitLines(text: string): string[] {
   return [...new Set(text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean))];
+}
+
+/** Saves one setting without touching the others. */
+export async function saveSetting(key: keyof AppSettings, value: string) {
+  await prisma.setting.upsert({ where: { key }, create: { key, value }, update: { value } });
 }

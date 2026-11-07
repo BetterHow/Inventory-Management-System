@@ -3,7 +3,7 @@ import { ArrowDownRight, ArrowUpRight, Coins, Gift, PackagePlus, Percent, Trendi
 import { PageHeader, Pills, WarehousePills, withParams, Field, Empty } from "@/components/ui";
 import { AutoForm } from "@/components/AutoForm";
 import { LineChart, BarChart, RankBars } from "@/components/Charts";
-import { analytics, resolvePeriod, PERIODS, NO_REVENUE } from "@/lib/analytics";
+import { analytics, resolvePeriod, PERIODS } from "@/lib/analytics";
 import { getUnit, pickWarehouse } from "@/lib/auth";
 import { activeWarehouses } from "@/lib/pickers";
 import { fmtMoney, fmtQty } from "@/lib/format";
@@ -44,7 +44,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const { cur, prev } = resolvePeriod(sp);
   const a = await analytics(cur, prev, wid);
   const { totals: t, prevTotals: p } = a;
-  const marginRate = pct(t.margin, t.sale);
+  const deduct = sp.loss === "deduct";
+  const shown = deduct ? t.net : t.margin;
+  const shownPrev = deduct ? p.net : p.margin;
+  const marginRate = pct(shown, t.sale);
   const unpricedCost = a.unpriced.reduce((s, r) => s + r.cost, 0);
   const whName = wid ? warehouses.find((w) => w.id === wid)?.name : "全部單位";
   const months = a.months;
@@ -56,20 +59,31 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       <div className="space-y-2">
         <WarehousePills path="/analytics" sp={sp} warehouses={warehouses} current={wid} mine={unit} />
         <div className="flex flex-wrap items-end gap-3">
-          <Pills items={PERIODS.map(([k, l]) => ({ href: withParams("/analytics", { warehouse: sp.warehouse }, { period: k }), label: l, active: cur.key === k }))} />
-          <AutoForm className="flex flex-wrap items-end gap-2" clearHref={cur.key === "custom" ? withParams("/analytics", { warehouse: sp.warehouse }, {}) : undefined}>
+          <Pills items={PERIODS.map(([k, l]) => ({ href: withParams("/analytics", { warehouse: sp.warehouse, loss: sp.loss }, { period: k }), label: l, active: cur.key === k }))} />
+          <AutoForm className="flex flex-wrap items-end gap-2" clearHref={cur.key === "custom" ? withParams("/analytics", { warehouse: sp.warehouse, loss: sp.loss }, {}) : undefined}>
             {sp.warehouse && <input type="hidden" name="warehouse" value={sp.warehouse} />}
+            {sp.loss && <input type="hidden" name="loss" value={sp.loss} />}
             <Field label="自訂期間" className="w-40"><input type="date" name="from" defaultValue={cur.key === "custom" ? cur.from : ""} className="input" /></Field>
             <Field label="到" className="w-40"><input type="date" name="to" defaultValue={cur.key === "custom" ? cur.to : ""} className="input" /></Field>
           </AutoForm>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          <span>贈送／損耗的成本：</span>
+          <Pills items={[
+            { href: withParams("/analytics", sp, { loss: undefined }), label: "另外列出，不影響價差", active: !deduct },
+            { href: withParams("/analytics", sp, { loss: "deduct" }), label: "從價差扣除（淨價差）", active: deduct },
+          ]} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Kpi label="耗用成本" value={t.cost} prev={p.cost} icon={TrendingDown} goodWhenUp={false} />
         <Kpi label="健保價／售價金額" value={t.sale} prev={p.sale} icon={Coins} />
-        <Kpi label="價差（售價 − 成本）" value={t.margin} prev={p.margin} icon={Percent}
-          hint={marginRate !== null && <span className="font-medium text-slate-700">毛利率 {marginRate.toFixed(1)}%</span>} />
+        <Kpi label={deduct ? "淨價差（已扣贈送／損耗）" : "價差（售價 − 成本）"} value={shown} prev={shownPrev} icon={Percent}
+          hint={<>
+            {marginRate !== null && <span className="font-medium text-slate-700">毛利率 {marginRate.toFixed(1)}%</span>}
+            <span className="w-full">{deduct ? `未扣除前：${fmtMoney(Math.round(t.margin))}` : `扣除贈送／損耗後：${fmtMoney(Math.round(t.net))}`}</span>
+          </>} />
         <Kpi label="進貨金額" value={t.received} prev={p.received} icon={PackagePlus} goodWhenUp={false} />
         <Kpi label="贈送／損耗成本" value={t.noRevenueCost} prev={p.noRevenueCost} icon={Gift} goodWhenUp={false} />
       </div>
@@ -95,9 +109,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           ]} />
         </section>
         <section className="card xl:col-span-2">
-          <h2 className="font-semibold text-slate-900">每月價差</h2>
-          <p className="mb-3 text-xs text-slate-500">有設定售價的品項：售價金額 − 成本</p>
-          <BarChart labels={months.map((m) => m.label)} values={months.map((m) => m.margin)} label="價差" pos="var(--color-teal-500)" neg="var(--color-rose-500)" height={300} width={440} />
+          <h2 className="font-semibold text-slate-900">{deduct ? "每月淨價差" : "每月價差"}</h2>
+          <p className="mb-3 text-xs text-slate-500">{deduct ? "售價金額 − 成本 − 贈送／損耗成本" : "有設定售價的品項：售價金額 − 成本"}</p>
+          <BarChart labels={months.map((m) => m.label)} values={months.map((m) => (deduct ? m.net : m.margin))} label={deduct ? "淨價差" : "價差"} pos="var(--color-teal-500)" neg="var(--color-rose-500)" height={300} width={440} />
         </section>
       </div>
 
@@ -105,11 +119,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-slate-600 hover:text-slate-900">看每月數字表</summary>
         <div className="overflow-x-auto border-t border-slate-100">
           <table className="table">
-            <thead><tr><th>月份</th><th className="num">耗用成本</th><th className="num">健保價／售價金額</th><th className="num">價差</th><th className="num">進貨金額</th></tr></thead>
+            <thead><tr><th>月份</th><th className="num">耗用成本</th><th className="num">健保價／售價金額</th><th className="num">價差</th><th className="num">淨價差</th><th className="num">進貨金額</th></tr></thead>
             <tbody>
               {months.map((m) => (
                 <tr key={m.key}><td>{m.key}</td><td className="num">{fmtMoney(Math.round(m.cost))}</td><td className="num">{fmtMoney(Math.round(m.sale))}</td>
-                  <td className={`num ${m.margin < 0 ? "text-rose-600" : ""}`}>{fmtMoney(Math.round(m.margin))}</td><td className="num">{fmtMoney(Math.round(m.received))}</td></tr>
+                  <td className={`num ${m.margin < 0 ? "text-rose-600" : ""}`}>{fmtMoney(Math.round(m.margin))}</td>
+                  <td className={`num ${m.net < 0 ? "text-rose-600" : ""}`}>{fmtMoney(Math.round(m.net))}</td><td className="num">{fmtMoney(Math.round(m.received))}</td></tr>
               ))}
             </tbody>
           </table>
@@ -127,7 +142,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         </section>
         <section className="card p-0">
           <h2 className="px-5 pb-2 pt-5 font-semibold text-slate-900">依用途</h2>
-          <p className="px-5 pb-3 text-xs text-slate-500">用途就是耗用登記的備註。{NO_REVENUE.join("、")}不算售價。</p>
+          <p className="px-5 pb-3 text-xs text-slate-500">用途就是耗用登記的備註。{a.noRevenueWords.join("、")}只算成本、不算售價（可在系統設定修改）。</p>
           {a.purposes.length === 0 ? <Empty>這段期間沒有耗用</Empty> : (
             <table className="table">
               <thead><tr><th>用途</th><th className="num">成本</th><th className="num">售價金額</th><th className="num">價差</th></tr></thead>
@@ -194,7 +209,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       )}
 
       <p className="text-xs text-slate-500">
-        成本＝耗用時該批的進貨單價。售價金額＝耗用數量 × 品項目前設定的健保價／售價（改價後，過去的期間也會用新價格計算）。
+        成本＝耗用時該批的進貨單價。售價金額＝耗用數量 × 耗用當天有效的健保價／售價（價格歷史在品項頁可看到）。
       </p>
     </div>
   );

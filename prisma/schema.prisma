@@ -79,7 +79,11 @@ model Item {
   defaultSupplierId Int?
   defaultSupplier   Supplier? @relation(fields: [defaultSupplierId], references: [id])
   refPrice          Decimal?  @db.Decimal(14, 2) // 參考單價（含稅）
-  salePrice         Decimal?  @db.Decimal(14, 2) // 健保價／售價（每單位），用來算價差
+  salePrice         Decimal?  @db.Decimal(14, 2) // 健保價／售價（每單位），用來算價差；目前生效的價格
+  priceSource       PriceSource @default(MANUAL) // NHI = 跟著健保署價格自動更新
+  nhiPrice          Decimal?  @db.Decimal(14, 2) // 最近一次匯入的健保參考價
+  nhiPriceFrom      DateTime? @db.Date // 該健保價的生效日
+  nhiCheckedAt      DateTime? // 最近一次匯入時有對到這個品項
   trackBatch        Boolean   @default(true) // 是否管批號效期
   note              String?
   active            Boolean   @default(true)
@@ -89,6 +93,7 @@ model Item {
   movements    StockMovement[]
   settings     ItemWarehouseSetting[]
   receiptLines ReceiptLine[]
+  prices       ItemPrice[]
 
   @@index([barcode])
   @@index([nhiCode])
@@ -291,4 +296,22 @@ model StocktakeLine {
 model Setting {
   key   String @id
   value String
+}
+
+enum PriceSource {
+  MANUAL
+  NHI
+}
+
+// 健保價／售價的歷史：統計時，每筆耗用用當天有效的價格
+model ItemPrice {
+  id            Int         @id @default(autoincrement())
+  itemId        Int
+  item          Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  price         Decimal     @db.Decimal(14, 2)
+  effectiveFrom DateTime    @db.Date
+  source        PriceSource
+  createdAt     DateTime    @default(now())
+
+  @@index([itemId, effectiveFrom])
 }
