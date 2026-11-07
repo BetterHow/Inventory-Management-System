@@ -59,8 +59,8 @@ export const RECEIPT_STATUS_LABEL: Record<string, string> = {
 };
 
 export const RECEIPT_STATUS_COLOR: Record<string, string> = {
-  ORDERED: "bg-sky-100 text-sky-800",
-  PENDING_INSPECTION: "bg-amber-100 text-amber-800",
-  RECEIVED: "bg-emerald-100 text-emerald-800",
-  CANCELLED: "bg-slate-200 text-slate-500",
+  ORDERED: "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200",
+  PENDING_INSPECTION: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
+  RECEIVED: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
+  CANCELLED: "bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200",
 };

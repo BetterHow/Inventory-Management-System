@@ -6,14 +6,20 @@ import { activeWarehouses } from "@/lib/pickers";
 import { fmtDate, fmtMoney, fmtQty } from "@/lib/format";
 import { SAFETY_LABEL, sum, type SafetyStatus } from "@/lib/logic";
 import { addEntry } from "../purchase-list/actions";
+import { AutoForm } from "@/components/AutoForm";
+import { getUnit, pickWarehouse } from "@/lib/auth";
 
 const FILTERS: SafetyStatus[] = ["NEGATIVE", "LT1", "LT2", "LT3", "OK", "NONE"];
 
 export default async function StockPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const warehouses = await activeWarehouses();
-  const wid = sp.warehouse === "all" ? undefined : Number(sp.warehouse ?? warehouses[0]?.id);
-  const all = await stockOverview(wid);
+  const [warehouses, unit] = await Promise.all([activeWarehouses(), getUnit()]);
+  const wid = pickWarehouse(sp.warehouse, unit);
+  const everything = await stockOverview(wid);
+  // In one warehouse, hide items that warehouse never had (e.g. 普拿疼 in 護理部) unless asked.
+  const showAllItems = sp.allItems === "1";
+  const all = showAllItems ? everything : everything.filter((r) => r.inWarehouse);
+  const hiddenCount = everything.length - all.length;
   const q = (sp.q ?? "").toLowerCase();
   const status = sp.status as SafetyStatus | undefined;
   const rows = all.filter(
@@ -21,22 +27,26 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   );
   const counts = Object.fromEntries(FILTERS.map((f) => [f, all.filter((r) => r.status === f).length]));
   const base = (extra: Record<string, string>) =>
-    "/stock?" + new URLSearchParams({ warehouse: sp.warehouse ?? String(wid ?? "all"), ...(sp.q ? { q: sp.q } : {}), ...extra });
+    "/stock?" + new URLSearchParams({ warehouse: sp.warehouse ?? String(wid ?? "all"), ...(sp.q ? { q: sp.q } : {}), ...(showAllItems ? { allItems: "1" } : {}), ...extra });
   const here = base(status ? { status } : {});
 
   return (
     <div>
       <PageHeader title="庫存總覽" />
       <Flash sp={sp} />
-      <form className="mb-3 flex flex-wrap gap-2">
-        <select name="warehouse" defaultValue={sp.warehouse ?? String(wid)} className="input max-w-[12rem]">
-          {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+      <AutoForm className="mb-3 flex flex-wrap gap-2">
+        <select name="warehouse" defaultValue={wid ? String(wid) : "all"} className="input max-w-[12rem]">
+          {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}{w.id === unit ? "（目前單位）" : ""}</option>)}
           <option value="all">全部庫別合計</option>
         </select>
         <input name="q" defaultValue={sp.q} placeholder="搜尋料號或品名" className="input max-w-xs" />
         {status && <input type="hidden" name="status" value={status} />}
-        <button className="btn-secondary">查詢</button>
-      </form>
+        {wid && (
+          <label className="flex items-center gap-1 text-sm text-slate-600" title="例如藥局的品項，在護理部從沒進過貨或用過">
+            <input type="checkbox" name="allItems" value="1" defaultChecked={showAllItems} /> 含本庫別沒有的品項{hiddenCount > 0 && `（${hiddenCount}）`}
+          </label>
+        )}
+      </AutoForm>
       <div className="mb-3 flex flex-wrap gap-1 text-sm">
         <Link href={base({})} className={`rounded-full px-3 py-1 ${!status ? "bg-teal-600 text-white" : "border border-slate-200 bg-white"}`}>全部 ({all.length})</Link>
         {FILTERS.map((f) => (

@@ -1,52 +1,180 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   color-scheme: light;
+  --page-bg: #f4f6f8;
+  --surface: #ffffff;
+  /* chart series (validated as a set for color-vision differences) */
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
 }
 
+/* Dark mode: the whole palette is re-stepped here, so pages don't need their own dark styles.
+   Grays are reversed (light text on dark surfaces); accent tints (50–300) become deep tints
+   and accent text shades (700–950) become light, while the 400–600 fills stay as they are. */
+html.dark {
+  color-scheme: dark;
+  --page-bg: oklch(17% 0.025 257);
+  --surface: oklch(21% 0.028 257);
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --color-slate-50: oklch(24% 0.03 257);
+  --color-slate-100: oklch(27.5% 0.03 257);
+  --color-slate-200: oklch(32% 0.03 257);
+  --color-slate-300: oklch(40% 0.03 257);
+  --color-slate-400: oklch(56% 0.03 257);
+  --color-slate-500: oklch(66% 0.03 257);
+  --color-slate-600: oklch(75% 0.03 257);
+  --color-slate-700: oklch(83% 0.03 257);
+  --color-slate-800: oklch(90% 0.03 257);
+  --color-slate-900: oklch(95% 0.03 257);
+  --color-slate-950: oklch(98% 0.03 257);
+  --color-teal-50: oklch(27% 0.045 188.216);
+  --color-teal-100: oklch(31% 0.06 188.216);
+  --color-teal-200: oklch(38% 0.08 188.216);
+  --color-teal-300: oklch(46% 0.1 188.216);
+  --color-teal-700: oklch(85.5% 0.138 181.071);
+  --color-teal-800: oklch(91.0% 0.096 180.426);
+  --color-teal-900: oklch(95.3% 0.051 180.801);
+  --color-teal-950: oklch(98.4% 0.014 180.72);
+  --color-rose-50: oklch(27% 0.045 13.697);
+  --color-rose-100: oklch(31% 0.06 13.697);
+  --color-rose-200: oklch(38% 0.08 13.697);
+  --color-rose-300: oklch(46% 0.1 13.697);
+  --color-rose-700: oklch(81.0% 0.117 11.638);
+  --color-rose-800: oklch(89.2% 0.058 10.001);
+  --color-rose-900: oklch(94.1% 0.03 12.58);
+  --color-rose-950: oklch(96.9% 0.015 12.422);
+  --color-amber-50: oklch(27% 0.045 46.201);
+  --color-amber-100: oklch(31% 0.06 46.201);
+  --color-amber-200: oklch(38% 0.08 46.201);
+  --color-amber-300: oklch(46% 0.1 46.201);
+  --color-amber-700: oklch(87.9% 0.169 91.605);
+  --color-amber-800: oklch(92.4% 0.12 95.746);
+  --color-amber-900: oklch(96.2% 0.059 95.617);
+  --color-amber-950: oklch(98.7% 0.022 95.277);
+  --color-emerald-50: oklch(27% 0.045 166.913);
+  --color-emerald-100: oklch(31% 0.06 166.913);
+  --color-emerald-200: oklch(38% 0.08 166.913);
+  --color-emerald-300: oklch(46% 0.1 166.913);
+  --color-emerald-700: oklch(84.5% 0.143 164.978);
+  --color-emerald-800: oklch(90.5% 0.093 164.15);
+  --color-emerald-900: oklch(95.0% 0.052 163.051);
+  --color-emerald-950: oklch(97.9% 0.021 166.113);
+  --color-sky-50: oklch(27% 0.045 240.79);
+  --color-sky-100: oklch(31% 0.06 240.79);
+  --color-sky-200: oklch(38% 0.08 240.79);
+  --color-sky-300: oklch(46% 0.1 240.79);
+  --color-sky-700: oklch(82.8% 0.111 230.318);
+  --color-sky-800: oklch(90.1% 0.058 230.902);
+  --color-sky-900: oklch(95.1% 0.026 236.824);
+  --color-sky-950: oklch(97.7% 0.013 236.62);
+  --color-violet-50: oklch(27% 0.045 292.759);
+  --color-violet-100: oklch(31% 0.06 292.759);
+  --color-violet-200: oklch(38% 0.08 292.759);
+  --color-violet-300: oklch(46% 0.1 292.759);
+  --color-violet-700: oklch(81.1% 0.111 293.571);
+  --color-violet-800: oklch(89.4% 0.057 293.283);
+  --color-violet-900: oklch(94.3% 0.029 294.588);
+  --color-violet-950: oklch(96.9% 0.016 293.756);
+  --color-orange-50: oklch(27% 0.045 37.304);
+  --color-orange-100: oklch(31% 0.06 37.304);
+  --color-orange-200: oklch(38% 0.08 37.304);
+  --color-orange-300: oklch(46% 0.1 37.304);
+  --color-orange-700: oklch(83.7% 0.128 66.29);
+  --color-orange-800: oklch(90.1% 0.076 70.697);
+  --color-orange-900: oklch(95.4% 0.038 75.164);
+  --color-orange-950: oklch(98.0% 0.016 73.684);
+}
+html.dark .bg-white { background-color: var(--surface); }
+html.dark .bg-white\/95 { background-color: color-mix(in oklab, var(--surface) 95%, transparent); }
+html.dark .shadow-sm, html.dark .card { --tw-shadow-color: rgb(0 0 0 / 0.3); }
+
+.login-bg { background: radial-gradient(ellipse at top, #ccfbf1 0%, var(--page-bg) 55%); }
+html.dark .login-bg { background: radial-gradient(ellipse at top, oklch(30% 0.06 185) 0%, var(--page-bg) 60%); }
+
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
-  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  @apply bg-[var(--page-bg)] text-slate-800 antialiased;
+  font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-1 rounded-md bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 cursor-pointer;
+    @apply inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-teal-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm shadow-teal-900/10 transition-colors hover:bg-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 disabled:opacity-50 cursor-pointer;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 cursor-pointer;
+    @apply inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-[var(--surface)] px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 cursor-pointer;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-1 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700 cursor-pointer;
+    @apply inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-rose-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-rose-700 cursor-pointer;
   }
   .btn-link {
-    @apply text-sm text-teal-700 hover:underline cursor-pointer;
+    @apply text-sm font-medium text-teal-700 hover:text-teal-800 hover:underline underline-offset-2 cursor-pointer;
   }
   .input {
-    @apply w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none;
+    @apply w-full rounded-lg border border-slate-300 bg-[var(--surface)] px-3 py-[7px] text-sm shadow-sm shadow-slate-900/[0.03] transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-3 focus:ring-teal-500/15 focus:outline-none disabled:bg-slate-50;
   }
   .label {
-    @apply mb-1 block text-xs font-medium text-slate-600;
+    @apply mb-1.5 block text-xs font-medium text-slate-600;
   }
   .card {
-    @apply rounded-lg border border-slate-200 bg-white p-4 shadow-sm;
+    @apply rounded-xl border border-slate-200/80 bg-[var(--surface)] p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.03)];
   }
   .table {
     @apply w-full text-sm;
   }
   .table th {
-    @apply border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold text-slate-600 whitespace-nowrap;
+    @apply border-b border-slate-200 bg-slate-50/80 px-4 py-2.5 text-left text-xs font-medium tracking-wide text-slate-500 whitespace-nowrap;
   }
   .table td {
-    @apply border-b border-slate-100 px-3 py-2 align-middle;
+    @apply border-b border-slate-100 px-4 py-2.5 align-middle whitespace-nowrap;
   }
-  .table tr:hover td {
-    @apply bg-slate-50;
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .table th.num {
+    @apply text-right;
+  }
+  /* Long free text (notes) may wrap, but never squeezed into a narrow column. */
+  .table td.wrap {
+    @apply min-w-48 whitespace-normal;
+  }
+  .table tbody tr:hover td {
+    @apply bg-teal-50/40;
   }
   .num {
     @apply text-right tabular-nums whitespace-nowrap;
   }
   .badge {
-    @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
   }
+}
+
+/* Dropdowns get one consistent arrow instead of each browser's own */
+select.input,
+select.select-plain {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 0.6rem center;
+  background-size: 16px;
+  background-repeat: no-repeat;
+  padding-right: 2rem;
+  cursor: pointer;
+}
+
+/* Page-loading feedback (see NavProgress) */
+@keyframes nav-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+.nav-progress {
+  animation: nav-progress 1s ease-in-out infinite;
+}
+body[data-navigating] main {
+  opacity: 0.55;
+  transition: opacity 150ms 150ms;
 }

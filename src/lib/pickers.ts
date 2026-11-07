@@ -43,3 +43,19 @@ export async function pickStock(): Promise<{ batches: PickBatch[]; stock: Record
 export async function activeWarehouses() {
   return prisma.warehouse.findMany({ where: { active: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
 }
+
+/** For each warehouse, the items it has ever had (stock, movements, settings, orders), so pickers can list just those. */
+export async function itemsByWarehouse(): Promise<Record<number, number[]>> {
+  const [batches, moves, settings, wanted, lines] = await Promise.all([
+    prisma.batch.findMany({ distinct: ["itemId", "warehouseId"], select: { itemId: true, warehouseId: true } }),
+    prisma.stockMovement.findMany({ distinct: ["itemId", "warehouseId"], select: { itemId: true, warehouseId: true } }),
+    prisma.itemWarehouseSetting.findMany({ select: { itemId: true, warehouseId: true } }),
+    prisma.purchaseListEntry.findMany({ distinct: ["itemId", "warehouseId"], select: { itemId: true, warehouseId: true } }),
+    prisma.receiptLine.findMany({ distinct: ["itemId", "receiptId"], select: { itemId: true, receipt: { select: { warehouseId: true } } } }),
+  ]);
+  const sets = new Map<number, Set<number>>();
+  const add = (w: number, i: number) => (sets.get(w) ?? sets.set(w, new Set()).get(w)!).add(i);
+  for (const r of [...batches, ...moves, ...settings, ...wanted]) add(r.warehouseId, r.itemId);
+  for (const l of lines) add(l.receipt.warehouseId, l.itemId);
+  return Object.fromEntries([...sets].map(([w, s]) => [w, [...s]]));
+}

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { attempt } from "@/lib/action";
+import { attempt, done } from "@/lib/action";
 import { UserError, bool, optInt, optNum, optStr, str } from "@/lib/form";
 
 function readItem(fd: FormData) {
@@ -20,6 +20,7 @@ function readItem(fd: FormData) {
     categoryId: optInt(fd, "categoryId"),
     defaultSupplierId: optInt(fd, "defaultSupplierId"),
     refPrice: optNum(fd, "refPrice"),
+    salePrice: optNum(fd, "salePrice"),
     trackBatch: bool(fd, "trackBatch"),
     note: optStr(fd, "note"),
     active: bool(fd, "active"),
@@ -32,7 +33,7 @@ export async function createItem(fd: FormData) {
     await prisma.item.create({ data: readItem(fd) });
   });
   revalidatePath("/items");
-  redirect("/items?ok=" + encodeURIComponent("已新增品項"));
+  return done("/items", "已新增品項");
 }
 
 export async function updateItem(id: number, fd: FormData) {
@@ -41,7 +42,7 @@ export async function updateItem(id: number, fd: FormData) {
     await prisma.item.update({ where: { id }, data: readItem(fd) });
   });
   revalidatePath("/items");
-  redirect("/items?ok=" + encodeURIComponent("已儲存"));
+  return done("/items", "已儲存");
 }
 
 /** Manual monthly usage per warehouse (blank = automatic). */
@@ -59,5 +60,5 @@ export async function saveItemSafety(itemId: number, fd: FormData) {
     }
   });
   revalidatePath("/stock");
-  redirect(`/items/${itemId}?ok=` + encodeURIComponent("已儲存安全量設定"));
+  return done(`/items/${itemId}`, "已儲存安全量設定");
 }

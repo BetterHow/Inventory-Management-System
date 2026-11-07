@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   // Direct (non-pooled) connection for migrations. Neon on Vercel sets both.
   directUrl = env("DATABASE_URL_UNPOOLED")
@@ -15,13 +15,16 @@ enum Role {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  name         String
-  passwordHash String
-  role         Role     @default(STAFF)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id                 Int        @id @default(autoincrement())
+  username           String     @unique
+  name               String
+  passwordHash       String
+  role               Role       @default(STAFF)
+  active             Boolean    @default(true)
+  // 負責庫別：列表與新單據預設只顯示／使用這個庫別（仍可切換到其他庫別）
+  defaultWarehouseId Int?
+  defaultWarehouse   Warehouse? @relation(fields: [defaultWarehouseId], references: [id])
+  createdAt          DateTime   @default(now())
 
   movements StockMovement[]
 }
@@ -38,6 +41,7 @@ model Warehouse {
   batches   Batch[]
   movements StockMovement[]
   settings  ItemWarehouseSetting[]
+  users     User[]
 }
 
 model Category {
@@ -75,14 +79,16 @@ model Item {
   defaultSupplierId Int?
   defaultSupplier   Supplier? @relation(fields: [defaultSupplierId], references: [id])
   refPrice          Decimal?  @db.Decimal(14, 2) // 參考單價（含稅）
+  salePrice         Decimal?  @db.Decimal(14, 2) // 健保價／售價（每單位），用來算價差
   trackBatch        Boolean   @default(true) // 是否管批號效期
   note              String?
   active            Boolean   @default(true)
   createdAt         DateTime  @default(now())
 
-  batches   Batch[]
-  movements StockMovement[]
-  settings  ItemWarehouseSetting[]
+  batches      Batch[]
+  movements    StockMovement[]
+  settings     ItemWarehouseSetting[]
+  receiptLines ReceiptLine[]
 
   @@index([barcode])
   @@index([nhiCode])
@@ -207,6 +213,7 @@ model ReceiptLine {
   receiptId  Int
   receipt    Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   itemId     Int
+  item       Item      @relation(fields: [itemId], references: [id])
   qty        Decimal   @db.Decimal(12, 2)
   freeQty    Decimal   @default(0) @db.Decimal(12, 2) // 贈品數量
   unitPrice  Decimal   @default(0) @db.Decimal(14, 4)

@@ -1,12 +1,13 @@
 import type { Item, Category, Supplier } from "@prisma/client";
-import { Field } from "./ui";
+import { Field, CancelLink } from "./ui";
 import { num } from "@/lib/format";
 
-export function ItemForm({ item, categories, suppliers, action }: {
+export function ItemForm({ item, categories, suppliers, action, cancelHref = "/items" }: {
   item?: Item;
   categories: Category[];
   suppliers: Supplier[];
   action: (fd: FormData) => Promise<void>;
+  cancelHref?: string;
 }) {
   return (
     <form action={action} className="card grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
@@ -25,6 +26,9 @@ export function ItemForm({ item, categories, suppliers, action }: {
       <Field label="參考單價（含稅）">
         <input name="refPrice" type="number" step="0.01" className="input" defaultValue={item?.refPrice ? num(item.refPrice) : ""} />
       </Field>
+      <Field label="健保價／售價（每單位）">
+        <input name="salePrice" type="number" step="0.01" className="input" defaultValue={item?.salePrice ? num(item.salePrice) : ""} placeholder="用來算價差，可留空" />
+      </Field>
       <Field label="預設供應商">
         <select name="defaultSupplierId" className="input" defaultValue={item?.defaultSupplierId ?? ""}>
           <option value="">（無）</option>
@@ -38,7 +42,7 @@ export function ItemForm({ item, categories, suppliers, action }: {
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="active" defaultChecked={item?.active ?? true} /> 使用中（取消勾選即停用）
       </label>
-      <div className="sm:col-span-2"><button className="btn">儲存</button></div>
+      <div className="flex gap-2 sm:col-span-2"><button className="btn">儲存</button><CancelLink href={cancelHref} /></div>
     </form>
   );
 }

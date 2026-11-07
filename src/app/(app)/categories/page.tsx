@@ -57,8 +57,8 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
               <input name="sortOrder" type="number" defaultValue={c.sortOrder} className="input w-20" title="排序" />
               <button className="btn-secondary">儲存</button>
             </form>
-            <span className="w-16 text-xs text-slate-400">{c._count.items} 項</span>
-            <form action={deleteCategory.bind(null, c.id)}><button className="btn-link text-rose-600">刪除</button></form>
+            <span className="w-12 whitespace-nowrap text-xs text-slate-400">{c._count.items} 項</span>
+            <form action={deleteCategory.bind(null, c.id)}><button className="btn-secondary px-2.5 py-1 text-xs text-rose-600 hover:border-rose-300 hover:bg-rose-50">刪除</button></form>
           </div>
         ))}
         <form action={addCategory} className="flex items-center gap-2 border-t border-slate-100 pt-3">

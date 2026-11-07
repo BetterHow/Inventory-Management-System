@@ -3,7 +3,8 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from "@/lib/session";
+import { SESSION_COOKIE, SESSION_MAX_AGE, REMEMBER_MAX_AGE, signSession } from "@/lib/session";
+import { UNIT_COOKIE } from "@/lib/prefs";
 
 export async function login(_prev: string | null, fd: FormData): Promise<string | null> {
   const username = String(fd.get("username") ?? "").trim();
@@ -12,15 +13,17 @@ export async function login(_prev: string | null, fd: FormData): Promise<string 
   if (!user || !user.active || !(await bcrypt.compare(password, user.passwordHash))) {
     return "帳號或密碼錯誤";
   }
-  const token = await signSession({ uid: user.id, role: user.role, name: user.name });
+  const maxAge = fd.get("stay") ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
+  const token = await signSession({ uid: user.id, role: user.role, name: user.name }, maxAge);
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_MAX_AGE,
+    maxAge,
     path: "/",
   });
+  store.delete(UNIT_COOKIE); // start from this person's own 負責庫別
   redirect("/");
 }
 

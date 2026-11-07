@@ -1,7 +1,8 @@
+import { done } from "@/lib/action";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { getSettings, saveSettings } from "@/lib/settings";
+import { getSettings, saveSettings, splitLines } from "@/lib/settings";
 import { bool, intVal, str } from "@/lib/form";
 import { PageHeader, Field } from "@/components/ui";
 import { Flash } from "@/components/Flash";
@@ -15,9 +16,10 @@ async function save(fd: FormData) {
     expiryWarnDays: intVal(fd, "expiryWarnDays"),
     expiryDangerDays: intVal(fd, "expiryDangerDays"),
     usageDays: Math.max(7, intVal(fd, "usageDays")),
+    consumptionNotes: splitLines(str(fd, "consumptionNotes")),
   });
   revalidatePath("/", "layout");
-  redirect("/settings?ok=" + encodeURIComponent("已儲存設定"));
+  return done("/settings", "已儲存設定");
 }
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
@@ -44,6 +46,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
         <Field label="自動安全量參考最近幾天的耗用">
           <input name="usageDays" type="number" defaultValue={s.usageDays} className="input" />
+        </Field>
+        <Field label="耗用備註的常用選項（一行一個）">
+          <textarea name="consumptionNotes" rows={6} defaultValue={s.consumptionNotes.join("\n")} className="input" />
         </Field>
         <button className="btn">儲存</button>
       </form>

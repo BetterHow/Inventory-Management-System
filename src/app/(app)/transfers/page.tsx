@@ -32,7 +32,7 @@ export default async function TransfersPage({ searchParams }: { searchParams: Pr
                   <td className="text-xs">
                     {moves.filter((m) => m.refId === t.id).map((m) => `${m.item.name} ×${fmtQty(-num(m.qty))}`).join("、")}
                   </td>
-                  <td>{t.note}</td>
+                  <td className="wrap">{t.note}</td>
                 </tr>
               ))}
             </tbody>

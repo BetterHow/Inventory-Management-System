@@ -18,6 +18,7 @@ export type OverviewRow = {
   nearestExpiry: Date | null;
   expiry: ExpiryStatus;
   defaultSupplierId: number | null;
+  inWarehouse: boolean; // 這個庫別有用過（有庫存、異動或安全量設定）；看全部庫別時一律為 true
 };
 
 /**
@@ -28,7 +29,7 @@ export async function stockOverview(warehouseId?: number): Promise<OverviewRow[]
   const settings = await getSettings();
   const since = new Date(Date.now() - settings.usageDays * 86400000);
   const whereWh = warehouseId ? { warehouseId } : {};
-  const [items, batches, usage, manual] = await Promise.all([
+  const [items, batches, usage, manual, moved, configured] = await Promise.all([
     prisma.item.findMany({ where: { active: true }, include: { category: true }, orderBy: { code: "asc" } }),
     prisma.batch.findMany({ where: whereWh }),
     prisma.stockMovement.groupBy({
@@ -37,7 +38,10 @@ export async function stockOverview(warehouseId?: number): Promise<OverviewRow[]
       _sum: { qty: true },
     }),
     prisma.itemWarehouseSetting.findMany({ where: { manualMonthlyUsage: { not: null }, ...whereWh } }),
+    warehouseId ? prisma.stockMovement.findMany({ where: { warehouseId }, distinct: ["itemId"], select: { itemId: true } }) : [],
+    warehouseId ? prisma.itemWarehouseSetting.findMany({ where: { warehouseId }, select: { itemId: true } }) : [],
   ]);
+  const used = new Set<number>([...batches.map((b) => b.itemId), ...moved.map((m) => m.itemId), ...configured.map((c) => c.itemId)]);
 
   const stock = new Map<number, number>();
   const value = new Map<number, number>();
@@ -88,6 +92,7 @@ export async function stockOverview(warehouseId?: number): Promise<OverviewRow[]
       nearestExpiry: ne,
       expiry: expiryStatus(ne, today, settings.expiryWarnDays, settings.expiryDangerDays),
       defaultSupplierId: i.defaultSupplierId,
+      inWarehouse: !warehouseId || used.has(i.id),
     };
   });
 }

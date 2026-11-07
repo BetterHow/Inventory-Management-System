@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { attempt } from "@/lib/action";
+import { attempt, done } from "@/lib/action";
 import { UserError, intVal, json, optStr, str } from "@/lib/form";
 import { removeStock } from "@/lib/stock";
 import { movementTime } from "@/lib/logic";
@@ -46,7 +46,5 @@ export async function createConsumption(fd: FormData) {
     });
   });
   revalidatePath("/");
-  const q = new URLSearchParams({ ok: "已登記耗用" });
-  if (warnings.length) q.set("warn", warnings.join("；"));
-  redirect(`/consumption?${q}`);
+  return done(warnings.length ? `/consumption?warn=${encodeURIComponent(warnings.join("；"))}` : "/consumption", "已登記耗用");
 }

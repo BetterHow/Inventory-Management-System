@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { attempt } from "@/lib/action";
+import { attempt, done } from "@/lib/action";
 import { UserError, intVal, optInt, optStr, str } from "@/lib/form";
 import { addStock, nextNumber, removeStock, stockByItem } from "@/lib/stock";
 import { sortFefo, todayTaipei } from "@/lib/logic";
@@ -74,7 +74,7 @@ export async function saveCounts(id: number, fd: FormData) {
     });
   });
   revalidatePath("/stocktakes");
-  redirect(`/stocktakes/${id}?ok=` + encodeURIComponent(finish ? "盤點完成，已調整庫存" : "已暫存"));
+  return done(`/stocktakes/${id}`, finish ? "盤點完成，已調整庫存" : "已暫存");
 }
 
 export async function deleteStocktake(id: number) {

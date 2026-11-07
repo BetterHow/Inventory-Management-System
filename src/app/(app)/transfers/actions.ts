@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { attempt } from "@/lib/action";
+import { attempt, done } from "@/lib/action";
 import { UserError, intVal, json, optStr, str } from "@/lib/form";
 import { addStock, nextNumber, removeStock } from "@/lib/stock";
 import { movementTime, todayTaipei } from "@/lib/logic";
@@ -49,7 +49,5 @@ export async function createTransfer(fd: FormData) {
     });
   });
   revalidatePath("/transfers");
-  const q = new URLSearchParams({ ok: "已完成調撥" });
-  if (warnings.length) q.set("warn", warnings.join("；"));
-  redirect(`/transfers?${q}`);
+  return done(warnings.length ? `/transfers?warn=${encodeURIComponent(warnings.join("；"))}` : "/transfers", "已完成調撥");
 }

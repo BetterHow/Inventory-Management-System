@@ -26,7 +26,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
             className={`rounded-full px-3 py-1 ${(filter ?? "") === v ? "bg-teal-600 text-white" : "border border-slate-200 bg-white"}`}>{l}</Link>
         ))}
         <span className="text-slate-500">列表中未付金額：<b>{fmtMoney(unpaidTotal)}</b></span>
-        {uninvoiced > 0 && <Link href="/receipts?status=RECEIVED" className="text-amber-700">{uninvoiced} 張已入庫進貨單還沒對發票</Link>}
+        {uninvoiced > 0 && <Link href="/receipts?warehouse=all&status=RECEIVED&invoice=none" className="text-amber-700">{uninvoiced} 張已入庫進貨單還沒對發票</Link>}
       </div>
       <div className="card overflow-x-auto p-0">
         {invoices.length === 0 ? <Empty>沒有發票</Empty> : (
