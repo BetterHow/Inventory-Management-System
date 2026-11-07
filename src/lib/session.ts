@@ -3,6 +3,8 @@ import { SignJWT, jwtVerify } from "jose";
 // Shared by middleware (edge) and server code, so no database access here.
 export const SESSION_COOKIE = "ims_session";
 const MAX_AGE = 60 * 60 * 12; // 12 hours
+/** "保持登入" on the login page: stay signed in on this browser for 30 days. */
+export const REMEMBER_MAX_AGE = 60 * 60 * 24 * 30;
 
 export type SessionPayload = { uid: number; role: "ADMIN" | "STAFF"; name: string };
 
@@ -12,11 +14,11 @@ function key() {
   return new TextEncoder().encode(secret);
 }
 
-export async function signSession(p: SessionPayload): Promise<string> {
+export async function signSession(p: SessionPayload, maxAge = MAX_AGE): Promise<string> {
   return new SignJWT(p)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${MAX_AGE}s`)
+    .setExpirationTime(`${maxAge}s`)
     .sign(key());
 }
 
