@@ -79,6 +79,7 @@ model Item {
   defaultSupplierId Int?
   defaultSupplier   Supplier? @relation(fields: [defaultSupplierId], references: [id])
   refPrice          Decimal?  @db.Decimal(14, 2) // 參考單價（含稅）
+  salePrice         Decimal?  @db.Decimal(14, 2) // 健保價／售價（每單位），用來算價差
   trackBatch        Boolean   @default(true) // 是否管批號效期
   note              String?
   active            Boolean   @default(true)

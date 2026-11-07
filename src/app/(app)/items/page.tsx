@@ -51,7 +51,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: SP }) 
             <thead>
               <tr>
                 <th>料號</th><th>品名</th><th>類別</th><th>單位</th><th>健保碼</th><th>條碼</th>
-                <th className="num">參考單價</th><th>預設供應商</th><th>狀態</th>
+                <th className="num">參考單價</th><th className="num">健保價／售價</th><th>預設供應商</th><th>狀態</th>
               </tr>
             </thead>
             <tbody>
@@ -64,6 +64,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: SP }) 
                   <td>{i.nhiCode}</td>
                   <td>{i.barcode}</td>
                   <td className="num">{i.refPrice ? fmtMoney(i.refPrice) : ""}</td>
+                  <td className="num">{i.salePrice ? fmtMoney(i.salePrice) : ""}</td>
                   <td>{i.defaultSupplier?.name}</td>
                   <td>{i.active ? "" : <span className="badge bg-slate-200">停用</span>}</td>
                 </tr>

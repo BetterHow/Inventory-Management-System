@@ -3,11 +3,12 @@ import { prisma } from "@/lib/db";
 import { SafetyBadge, ExpiryBadge } from "@/components/ui";
 import { stockOverview } from "@/lib/overview";
 import { fmtDate, fmtMoney, fmtQty, num } from "@/lib/format";
-import { parseTaipeiDate, sum, taipeiParts } from "@/lib/logic";
+import { parseTaipeiDate, sum, taipeiParts, todayTaipei } from "@/lib/logic";
 import { getUnit, requireUser } from "@/lib/auth";
+import { periodMargin } from "@/lib/analytics";
 import {
   AlertTriangle, CalendarClock, ClipboardMinus, PackagePlus, ShoppingCart, Boxes, Truck, ClipboardCheck,
-  FileWarning, Wallet, TrendingDown, TrendingUp, ChevronRight, CheckCircle2, type LucideIcon,
+  FileWarning, Wallet, Percent, TrendingDown, TrendingUp, ChevronRight, CheckCircle2, type LucideIcon,
 } from "lucide-react";
 
 type Tone = "bad" | "warn" | "ok" | "info";
@@ -77,7 +78,8 @@ export default async function Dashboard() {
   const greeting = hour < 11 ? "早安" : hour < 18 ? "午安" : "晚安";
   const wh = unit ? { warehouseId: unit } : {};
   const unitName = unit ? (await prisma.warehouse.findUnique({ where: { id: unit } }))?.name : null;
-  const [rows, consumed, received, ordered, pendingInspection, noInvoice, unpaid] = await Promise.all([
+  const monthFrom = `${p.y}-${String(p.m).padStart(2, "0")}-01`;
+  const [rows, consumed, received, ordered, pendingInspection, noInvoice, unpaid, margin] = await Promise.all([
     stockOverview(unit).then((r) => r.filter((x) => x.inWarehouse)),
     prisma.stockMovement.findMany({ where: { type: "CONSUME", date: { gte: monthStart }, ...wh }, select: { qty: true, unitCost: true } }),
     prisma.receipt.aggregate({ where: { status: "RECEIVED", date: { gte: monthStartDate }, ...wh }, _sum: { totalAmount: true } }),
@@ -85,6 +87,7 @@ export default async function Dashboard() {
     prisma.receipt.count({ where: { status: "PENDING_INSPECTION", ...wh } }),
     prisma.receipt.count({ where: { status: "RECEIVED", invoiceId: null, ...wh } }),
     prisma.invoice.aggregate({ where: { paid: false }, _sum: { amount: true } }),
+    periodMargin(monthFrom, todayTaipei(), unit),
   ]);
   const low = rows.filter((r) => r.status === "NEGATIVE" || r.status === "LT1");
   const expiring = rows.filter((r) => r.expiry === "EXPIRED" || r.expiry === "DANGER" || r.expiry === "WARN");
@@ -128,8 +131,10 @@ export default async function Dashboard() {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold text-slate-500">本月金額</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Stat label="本月耗用" value={fmtMoney(consumedAmt)} href="/reports?tab=consumption&measure=amount" tone="info" icon={TrendingDown} />
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <Stat label="本月耗用成本" value={fmtMoney(Math.round(consumedAmt))} href="/analytics" tone="info" icon={TrendingDown} />
+          <Stat label="本月價差" value={fmtMoney(Math.round(margin.margin))} href="/analytics" tone="info" icon={Percent}
+            hint={margin.sale ? `毛利率 ${((margin.margin / margin.sale) * 100).toFixed(1)}%` : "品項設定售價後才會計算"} />
           <Stat label="本月進貨" value={fmtMoney(received._sum.totalAmount)} href="/reports?tab=receiving" tone="info" icon={TrendingUp} />
           <Stat label="未付發票" value={fmtMoney(unpaid._sum.amount)} href="/invoices?paid=0" tone="info" icon={Wallet} hint="全部單位" />
         </div>

@@ -20,6 +20,7 @@ function readItem(fd: FormData) {
     categoryId: optInt(fd, "categoryId"),
     defaultSupplierId: optInt(fd, "defaultSupplierId"),
     refPrice: optNum(fd, "refPrice"),
+    salePrice: optNum(fd, "salePrice"),
     trackBatch: bool(fd, "trackBatch"),
     note: optStr(fd, "note"),
     active: bool(fd, "active"),

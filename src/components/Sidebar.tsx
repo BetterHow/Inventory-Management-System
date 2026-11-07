@@ -6,9 +6,10 @@ import { setUnit } from "@/app/(app)/unit-actions";
 import { NAV_START_EVENT, NAV_END_EVENT } from "./NavProgress";
 
 import { SIDEBAR_COOKIE } from "@/lib/prefs";
+import { ThemeToggle } from "./ThemeToggle";
 import {
   LayoutDashboard, ClipboardMinus, PackagePlus, ShoppingCart, Receipt, Boxes, ArrowLeftRight, ClipboardCheck,
-  BarChart3, Pill, Truck, Tags, Building2, Users, Settings, LogOut, ChevronsLeft, ChevronsRight, Menu, X, Package,
+  BarChart3, PieChart, Pill, Truck, Tags, Building2, Users, Settings, LogOut, ChevronsLeft, ChevronsRight, Menu, X, Package,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,7 +34,7 @@ export const NAV: NavGroup[] = [
       { href: "/stocktakes", label: "盤點", icon: ClipboardCheck },
     ],
   },
-  { title: "報表", links: [{ href: "/reports", label: "報表", icon: BarChart3 }] },
+  { title: "報表", links: [{ href: "/analytics", label: "統計分析", icon: PieChart }, { href: "/reports", label: "報表", icon: BarChart3 }] },
   {
     title: "主檔",
     links: [
@@ -108,7 +109,7 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
 
   const brand = (
     <Link href="/" title="回首頁" className="flex min-w-0 items-center gap-2.5 rounded-lg" onClick={() => setOpen(false)}>
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-sm shadow-teal-900/20">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-sm shadow-teal-900/20">
         <Package className="size-5" strokeWidth={2.2} />
       </span>
       {!collapsed && (
@@ -125,7 +126,7 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
       {/* Phone: a slim top bar with the brand and a menu button */}
       <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur md:hidden">
         <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
-          <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 text-white"><Package className="size-4" /></span>
+          <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 text-white"><Package className="size-4" /></span>
           <span className="font-semibold text-slate-900">{clinicName}</span>
           <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">{unitName}</span>
         </Link>
@@ -205,6 +206,7 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
               <div className="truncate text-sm font-medium text-slate-800">{userName}</div>
               <div className="text-xs text-slate-500">{isAdmin ? "管理員" : "使用者"}</div>
             </div>
+            <ThemeToggle compact />
             <form action={logout}>
               <button title="登出" aria-label="登出" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
                 <LogOut className="size-4" />
