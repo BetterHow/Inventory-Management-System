@@ -4,14 +4,14 @@ import { PageHeader, Empty, Field } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { fmtDateTime, fmtQty, num } from "@/lib/format";
 import { activeWarehouses, pickItems, itemsByWarehouse } from "@/lib/pickers";
-import { getUnit } from "@/lib/auth";
+import { getAccess, getUnit } from "@/lib/auth";
 import { ItemPicker } from "@/components/ItemPicker";
 import { addEntry, addSuggestions, bulkAction, deleteEntry } from "./actions";
 import { reorderSuggestions } from "@/lib/reorder";
 
 export default async function PurchaseListPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const unit = await getUnit();
+  const [unit, access] = await Promise.all([getUnit(), getAccess()]);
   const [entries, items, suppliers, warehouses, ordered, picks, byWh] = await Promise.all([
     prisma.purchaseListEntry.findMany({ where: { status: "PENDING", ...(unit ? { warehouseId: unit } : {}) }, orderBy: { createdAt: "asc" } }),
     prisma.item.findMany({ where: { active: true }, orderBy: { code: "asc" } }),
@@ -74,7 +74,7 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
         </Field>
         <Field label="數量"><input name="qty" type="number" step="0.01" className="input" required /></Field>
         <Field label="庫別">
-          <select name="warehouseId" defaultValue={unit} className="input">{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select>
+          <select name="warehouseId" defaultValue={unit} className="input">{warehouses.filter((w) => access.canWrite(w.id)).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select>
         </Field>
         <Field label="供應商（空白=品項預設）">
           <select name="supplierId" className="input">

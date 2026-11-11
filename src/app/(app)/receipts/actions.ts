@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { assertWrite, requireUser } from "@/lib/auth";
 import { attempt, done } from "@/lib/action";
 import { UserError, intVal, json, optNum, optStr, str } from "@/lib/form";
 import { addStock, nextNumber } from "@/lib/stock";
@@ -84,6 +84,7 @@ export async function saveReceipt(id: number | null, fd: FormData) {
   await attempt(back, async () => {
     const supplierId = intVal(fd, "supplierId");
     const warehouseId = intVal(fd, "warehouseId");
+    await assertWrite(warehouseId);
     if (!supplierId) throw new UserError("請選擇供應商");
     const dateStr = str(fd, "date") || todayTaipei();
     const lines = readLines(fd);
@@ -94,6 +95,7 @@ export async function saveReceipt(id: number | null, fd: FormData) {
     await prisma.$transaction(async (tx) => {
       if (id) {
         const existing = await tx.receipt.findUniqueOrThrow({ where: { id } });
+        await assertWrite(existing.warehouseId);
         if (existing.status === "RECEIVED" || existing.status === "CANCELLED") throw new UserError("已入庫或已取消的進貨單不能修改");
         await tx.receiptLine.deleteMany({ where: { receiptId: id } });
         await tx.receipt.update({
@@ -130,6 +132,7 @@ export async function inspectReceipt(id: number) {
   await attempt(`/receipts/${id}`, async () => {
     await prisma.$transaction(async (tx) => {
       const r = await tx.receipt.findUniqueOrThrow({ where: { id } });
+      await assertWrite(r.warehouseId);
       if (r.status !== "PENDING_INSPECTION" && r.status !== "ORDERED") throw new UserError("這張進貨單不是待驗收狀態");
       await tx.receipt.update({ where: { id }, data: { inspectedById: user.id, inspectedAt: new Date() } });
       await receiveIntoStock(tx, id, user.id);
@@ -143,6 +146,7 @@ export async function cancelReceipt(id: number) {
   await requireUser();
   await attempt(`/receipts/${id}`, async () => {
     const r = await prisma.receipt.findUniqueOrThrow({ where: { id } });
+    await assertWrite(r.warehouseId);
     if (r.status === "RECEIVED") throw new UserError("已入庫的進貨單不能取消，請用盤點或退貨調整");
     await prisma.receipt.update({ where: { id }, data: { status: "CANCELLED" } });
     await prisma.purchaseListEntry.deleteMany({ where: { receiptId: id } });
@@ -156,6 +160,7 @@ export async function linkInvoice(id: number, fd: FormData) {
   await requireUser();
   await attempt(`/receipts/${id}`, async () => {
     const r = await prisma.receipt.findUniqueOrThrow({ where: { id } });
+    await assertWrite(r.warehouseId);
     const existingId = optNum(fd, "invoiceId");
     if (existingId) {
       await prisma.receipt.update({ where: { id }, data: { invoiceId: existingId } });
@@ -180,6 +185,10 @@ export async function linkInvoice(id: number, fd: FormData) {
 
 export async function unlinkInvoice(id: number) {
   await requireUser();
+  await attempt(`/receipts/${id}`, async () => {
+    const r = await prisma.receipt.findUniqueOrThrow({ where: { id } });
+    await assertWrite(r.warehouseId);
+  });
   await prisma.receipt.update({ where: { id }, data: { invoiceId: null } });
   revalidatePath(`/receipts/${id}`);
 }

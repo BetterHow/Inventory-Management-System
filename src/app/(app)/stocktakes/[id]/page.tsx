@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertRead } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { fmtQty, num } from "@/lib/format";
@@ -12,6 +13,7 @@ export default async function StocktakePage({ params, searchParams }: {
   const sp = await searchParams;
   const st = await prisma.stocktake.findUnique({ where: { id: Number(id) }, include: { lines: { orderBy: { id: "asc" } } } });
   if (!st) notFound();
+  await assertRead(st.warehouseId);
   const [items, wh] = await Promise.all([
     prisma.item.findMany({ where: { id: { in: st.lines.map((l) => l.itemId) } } }),
     prisma.warehouse.findUnique({ where: { id: st.warehouseId } }),

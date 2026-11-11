@@ -47,15 +47,22 @@ async function saveUser(id: number, fd: FormData) {
         ...(password ? { passwordHash: await bcrypt.hash(password, 10) } : {}),
       },
     });
+    // 部門權限: only restrictions are stored; 可改 = no row.
+    const limits = [...fd.entries()].flatMap(([k, v]) =>
+      k.startsWith("acc:") && (v === "READ" || v === "NONE") ? [{ userId: id, warehouseId: Number(k.slice(4)), level: String(v) }] : []);
+    await prisma.$transaction([
+      prisma.userWarehouseAccess.deleteMany({ where: { userId: id } }),
+      prisma.userWarehouseAccess.createMany({ data: role === "ADMIN" ? [] : limits }),
+    ]);
   });
-  revalidatePath("/users");
+  revalidatePath("/", "layout");
   return done("/users", "已儲存");
 }
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   await requireAdmin();
   const sp = await searchParams;
-  const [users, warehouses] = await Promise.all([prisma.user.findMany({ orderBy: { id: "asc" } }), activeWarehouses()]);
+  const [users, warehouses] = await Promise.all([prisma.user.findMany({ orderBy: { id: "asc" }, include: { access: true } }), activeWarehouses()]);
   const whSelect = (v?: number | null) => (
     <select name="defaultWarehouseId" defaultValue={v ?? ""} className="input w-36" title="負責庫別：列表預設只顯示這個庫別">
       <option value="">負責庫別：全部</option>
@@ -65,9 +72,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   return (
     <div className="max-w-4xl">
       <PageHeader title="使用者" />
-      <p className="mb-3 text-sm text-slate-500">「負責庫別」設定後，這個人打開進貨單、耗用紀錄、庫存總覽時，會先只看到自己的庫別，新增單據也會預設這個庫別（需要時仍可切換到其他庫別）。</p>
+      <p className="mb-3 text-sm text-slate-500">新增人員：在最下面那一列填帳號、姓名、密碼後按「新增」，把帳號密碼告訴對方即可。每個人用自己的帳號，操作紀錄才分得出是誰。「部門權限」預設全部開放，需要時再展開調整：只能看＝看得到但不能新增或修改；不開放＝完全看不到那個部門。「負責庫別」設定後，這個人打開進貨單、耗用紀錄、庫存總覽時，會先只看到自己的庫別，新增單據也會預設這個庫別（需要時仍可切換到其他庫別）。</p>
       <Flash sp={sp} />
-      <div className="card space-y-2">
+      <div className="card space-y-3 divide-y divide-slate-100 [&>form]:pt-3 [&>form:first-child]:pt-0">
         {users.map((u) => (
           <form key={u.id} action={saveUser.bind(null, u.id)} className="flex flex-wrap items-center gap-2">
             <span className="w-28 text-sm font-medium">{u.username}</span>
@@ -80,9 +87,28 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             <input name="password" type="password" placeholder="新密碼（不改留空）" className="input w-44" autoComplete="new-password" />
             <label className="flex items-center gap-1 text-sm"><input type="checkbox" name="active" defaultChecked={u.active} /> 啟用</label>
             <button className="btn-secondary">儲存</button>
+            {u.role === "ADMIN" ? <span className="w-full text-xs text-slate-400">部門權限：管理員可看可改全部部門</span> : (
+              <details className="w-full" open={u.access.length > 0}>
+                <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-800">
+                  部門權限{u.access.length ? `：${u.access.length} 個部門有限制` : "：全部可看可改"}
+                </summary>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 rounded-lg bg-slate-50 px-3 py-2.5">
+                  {warehouses.map((w) => (
+                    <label key={w.id} className="flex items-center gap-1.5 text-sm">
+                      <span className="text-slate-600">{w.name}</span>
+                      <select name={`acc:${w.id}`} defaultValue={u.access.find((a) => a.warehouseId === w.id)?.level ?? "WRITE"} className="input w-28 py-1 text-sm">
+                        <option value="WRITE">可看可改</option>
+                        <option value="READ">只能看</option>
+                        <option value="NONE">不開放</option>
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              </details>
+            )}
           </form>
         ))}
-        <form action={addUser} className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+        <form action={addUser} className="flex flex-wrap items-center gap-2">
           <input name="username" placeholder="帳號" className="input w-28" />
           <input name="name" placeholder="姓名" className="input w-32" />
           <select name="role" className="input w-28">

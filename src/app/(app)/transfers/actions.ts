@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { assertWrite, getAccess, requireUser } from "@/lib/auth";
 import { attempt, done } from "@/lib/action";
 import { UserError, intVal, json, optStr, str } from "@/lib/form";
 import { addStock, nextNumber, removeStock } from "@/lib/stock";
@@ -16,6 +16,9 @@ export async function createTransfer(fd: FormData) {
     const from = intVal(fd, "warehouseId");
     const to = intVal(fd, "toWarehouseId");
     if (from === to) throw new UserError("調出與調入庫別不能相同");
+    // Sending needs 可改 on the source; the destination only has to be visible to this person.
+    await assertWrite(from);
+    if (!(await getAccess()).canRead(to)) throw new UserError("沒有調入庫別的權限");
     const dateStr = str(fd, "date") || todayTaipei();
     const date = movementTime(dateStr);
     const lines = json<Line[]>(fd, "lines").filter((l) => Number(l.qty) > 0);

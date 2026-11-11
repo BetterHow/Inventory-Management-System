@@ -360,7 +360,7 @@ export function WarehouseLines(props: {
   warehouseLabel?: string;
   itemsByWh?: Record<number, number[]>;
 }) {
-  const [wid, setWid] = useState<number>(props.defaultWarehouseId ?? props.warehouses[0]?.id ?? 0);
+  const [wid, setWid] = useState<number>(props.warehouses.find((w) => w.id === props.defaultWarehouseId)?.id ?? props.warehouses[0]?.id ?? 0);
   return (
     <div>
       <label className="mb-3 block max-w-xs">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getAccess, getUnit, pickWarehouse } from "@/lib/auth";
 import { PageHeader, ExpiryBadge, Empty } from "@/components/ui";
 import { fmtDate, fmtDateTime, fmtMoney, fmtQty, num, MOVEMENT_LABEL } from "@/lib/format";
 import { expiryStatus } from "@/lib/logic";
@@ -15,7 +16,8 @@ export default async function ItemStockPage({ params, searchParams }: {
   const item = await prisma.item.findUnique({ where: { id: Number(itemId) } });
   if (!item) notFound();
   const warehouses = await activeWarehouses();
-  const wid = sp.warehouse ? Number(sp.warehouse) : undefined;
+  const [access, unit] = await Promise.all([getAccess(), getUnit()]);
+  const wid = await pickWarehouse(sp.warehouse ?? "all", unit);
   const where = { itemId: item.id, ...(wid ? { warehouseId: wid } : {}) };
   const [batches, moves, settings] = await Promise.all([
     prisma.batch.findMany({ where: { ...where, NOT: { qty: 0 } }, include: { warehouse: true }, orderBy: [{ expiryDate: "asc" }] }),
@@ -34,7 +36,7 @@ export default async function ItemStockPage({ params, searchParams }: {
         <Link href={`/items/${item.id}`} className="btn-secondary">品項設定</Link>
       </PageHeader>
       <div className="flex flex-wrap gap-1 text-sm">
-        <Link href={`/stock/${item.id}`} className={`rounded-full px-3 py-1 ${!wid ? "bg-teal-600 text-white" : "border border-slate-200 bg-white"}`}>全部庫別</Link>
+        {!access.limited && <Link href={`/stock/${item.id}`} className={`rounded-full px-3 py-1 ${!wid ? "bg-teal-600 text-white" : "border border-slate-200 bg-white"}`}>全部庫別</Link>}
         {warehouses.map((w) => (
           <Link key={w.id} href={`/stock/${item.id}?warehouse=${w.id}`} className={`rounded-full px-3 py-1 ${wid === w.id ? "bg-teal-600 text-white" : "border border-slate-200 bg-white"}`}>{w.name}</Link>
         ))}

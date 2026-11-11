@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/db";
+import { getAccess } from "@/lib/auth";
 import { PageHeader, LinkButton, Empty } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { fmtDateTime, fmtQty, num } from "@/lib/format";
 
 export default async function TransfersPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const transfers = await prisma.transfer.findMany({ orderBy: [{ date: "desc" }, { id: "desc" }], take: 100 });
+  const { hidden } = await getAccess();
+  const transfers = await prisma.transfer.findMany({ where: { OR: [{ fromWarehouseId: { notIn: hidden } }, { toWarehouseId: { notIn: hidden } }] }, orderBy: [{ date: "desc" }, { id: "desc" }], take: 100 });
   const [warehouses, moves] = await Promise.all([
     prisma.warehouse.findMany(),
     prisma.stockMovement.findMany({

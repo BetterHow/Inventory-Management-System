@@ -1,11 +1,12 @@
 import ExcelJS from "exceljs";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getUnit, pickWarehouse } from "@/lib/auth";
 import { buildReport, defaultParams } from "@/lib/reports";
 
 export async function GET(req: Request) {
   if (!(await getCurrentUser())) return new Response("Unauthorized", { status: 401 });
   const sp = Object.fromEntries(new URL(req.url).searchParams);
-  const report = await buildReport(defaultParams(sp));
+  const wid = await pickWarehouse(sp.warehouse ?? "all", await getUnit());
+  const report = await buildReport(defaultParams({ ...sp, warehouse: wid ? String(wid) : "all" }));
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("報表");

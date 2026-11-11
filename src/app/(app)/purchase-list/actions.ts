@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { assertWrite, requireUser } from "@/lib/auth";
 import { attempt, done } from "@/lib/action";
 import { UserError, intVal, numVal, optInt, optStr, str, withParam } from "@/lib/form";
 import { nextNumber } from "@/lib/stock";
@@ -20,6 +20,7 @@ export async function addEntry(fd: FormData) {
     if (!item) throw new UserError(`找不到品項「${code}」`);
     const qty = numVal(fd, "qty");
     if (qty <= 0) throw new UserError("數量要大於 0");
+    await assertWrite(intVal(fd, "warehouseId"));
     await prisma.purchaseListEntry.create({
       data: {
         itemId: item.id,
@@ -43,6 +44,7 @@ export async function bulkAction(fd: FormData) {
   await attempt("/purchase-list", async () => {
     if (ids.length === 0) throw new UserError("請先勾選項目");
     const entries = await prisma.purchaseListEntry.findMany({ where: { id: { in: ids }, status: "PENDING" } });
+    await assertWrite(...new Set(entries.map((e) => e.warehouseId)));
     if (action === "clear") {
       await prisma.purchaseListEntry.deleteMany({ where: { id: { in: entries.map((e) => e.id) } } });
       msg = `已刪除 ${entries.length} 項`;
@@ -87,6 +89,10 @@ export async function bulkAction(fd: FormData) {
 
 export async function deleteEntry(id: number) {
   await requireUser();
+  await attempt("/purchase-list", async () => {
+    const e = await prisma.purchaseListEntry.findUnique({ where: { id } });
+    if (e) await assertWrite(e.warehouseId);
+  });
   await prisma.purchaseListEntry.deleteMany({ where: { id, status: "PENDING" } });
   revalidatePath("/purchase-list");
   return done("/purchase-list", "已刪除");
@@ -99,6 +105,7 @@ export async function addSuggestions(fd: FormData) {
   let n = 0;
   await attempt("/purchase-list", async () => {
     if (!picked.length) throw new UserError("請先勾選要加入的品項");
+    await assertWrite(...new Set(picked.map((k) => Number(k.split(":")[0]))));
     const ids = [...new Set(picked.map((k) => Number(k.split(":")[1])))];
     const items = new Map((await prisma.item.findMany({ where: { id: { in: ids } } })).map((i) => [i.id, i]));
     const data = picked.flatMap((k) => {
