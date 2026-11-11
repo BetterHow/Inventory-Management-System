@@ -11,7 +11,7 @@ const AREAS: [string, string][] = [
 export const AREA_NAMES = [...new Set(AREAS.map(([, n]) => n))];
 
 /** Writes one line of 操作紀錄. Never throws: a failed log must not undo the work it describes. */
-export async function audit(path: string, action: string, detail?: string | null, who?: { id: number; name: string }) {
+export async function audit(path: string, action: string, detail?: string | null, who?: { id?: number; name: string }) {
   try {
     const user = who ?? (await getCurrentUser());
     const clean = path.split("?")[0];

@@ -10,6 +10,9 @@ export type AppSettings = {
   consumptionNotes: string[]; // 耗用備註的常用選項
   noRevenueNotes: string[]; // 這些用途的耗用不算售價（贈送、損耗⋯）
   nhiPriceUrl: string; // 健保價格檔的下載網址
+  digestEnabled: boolean; // 每日提醒信
+  digestEmails: string[]; // 收件人
+  digestSkipEmpty: boolean; // 沒有要提醒的事就不寄
 };
 
 const DEFAULTS: AppSettings = {
@@ -21,6 +24,9 @@ const DEFAULTS: AppSettings = {
   consumptionNotes: ["門診扣庫", "各單位領用", "贈送", "損耗", "過期報廢"],
   noRevenueNotes: ["贈送", "損耗", "過期報廢"],
   nhiPriceUrl: "",
+  digestEnabled: false,
+  digestEmails: [],
+  digestSkipEmpty: true,
 };
 
 export async function getSettings(): Promise<AppSettings> {
@@ -35,6 +41,9 @@ export async function getSettings(): Promise<AppSettings> {
     consumptionNotes: map.has("consumptionNotes") ? splitLines(map.get("consumptionNotes")!) : DEFAULTS.consumptionNotes,
     noRevenueNotes: map.has("noRevenueNotes") ? splitLines(map.get("noRevenueNotes")!) : DEFAULTS.noRevenueNotes,
     nhiPriceUrl: map.get("nhiPriceUrl") ?? DEFAULTS.nhiPriceUrl,
+    digestEnabled: map.get("digestEnabled") === "true",
+    digestEmails: map.has("digestEmails") ? splitLines(map.get("digestEmails")!) : DEFAULTS.digestEmails,
+    digestSkipEmpty: map.has("digestSkipEmpty") ? map.get("digestSkipEmpty") === "true" : DEFAULTS.digestSkipEmpty,
   };
 }
 
