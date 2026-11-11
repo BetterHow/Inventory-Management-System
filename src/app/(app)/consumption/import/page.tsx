@@ -20,6 +20,7 @@ export default async function HisImportPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <PageHeader title="匯入 HIS 耗用" description="上傳方鼎每日「藥品耗用統計表」，自動扣庫、記錄實收金額與價別。">
+        <Link href="/consumption/import/report" className="btn-secondary">HIS 耗用分析</Link>
         <Link href="/consumption" className="btn-secondary">回耗用紀錄</Link>
       </PageHeader>
       <Flash sp={sp} />

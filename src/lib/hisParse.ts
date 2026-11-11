@@ -138,3 +138,25 @@ export function classifyPrice(price: number, nhiPrice: number | null): PriceType
   if (nhiPrice != null && Math.abs(price - nhiPrice) < 0.005) return "NHI";
   return "SELF";
 }
+
+/**
+ * Classifies every row of one report. When an item has a 健保碼 but no 健保價 in the system yet,
+ * its lowest non-zero price in the report is taken as 健保 (健保價 is usually the lowest), marked as a guess.
+ */
+export function classifyRows<R extends { code: string; price: number }>(
+  rows: R[],
+  info: (code: string) => { nhiPrice: number | null; hasNhiCode: boolean } | null,
+): (R & { priceType: PriceType; guessed: boolean })[] {
+  const lowest = new Map<string, number>();
+  for (const r of rows) {
+    if (Math.abs(r.price) < 0.005) continue;
+    const cur = lowest.get(r.code);
+    if (cur === undefined || r.price < cur) lowest.set(r.code, r.price);
+  }
+  return rows.map((r) => {
+    const i = info(r.code);
+    if (i?.nhiPrice != null || !i?.hasNhiCode) return { ...r, priceType: classifyPrice(r.price, i?.nhiPrice ?? null), guessed: false };
+    const guess = lowest.get(r.code) ?? null;
+    return { ...r, priceType: classifyPrice(r.price, guess), guessed: Math.abs(r.price) >= 0.005 };
+  });
+}
