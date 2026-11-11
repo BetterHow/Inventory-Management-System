@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseHisText, parseHisTable, classifyPrice, findPeriod } from "../src/lib/hisParse.ts";
+import { parseHisText, parseHisTable, classifyPrice, classifyRows, findPeriod } from "../src/lib/hisParse.ts";
 
 const printed = `                    台全診所
                   藥品耗用統計表
@@ -54,4 +54,23 @@ test("classifyPrice: 0 = 贈送, equals NHI = 健保, else 自費", () => {
 
 test("findPeriod with western dates", () => {
   assert.deepEqual(findPeriod("日期 2026/11/01 ~ 2026/11/30"), { from: "2026-11-01", to: "2026-11-30" });
+});
+
+test("classifyRows guesses 健保 as the lowest price when the system has no 健保價 yet", () => {
+  const rows = [
+    { code: "AC1", price: 50 },
+    { code: "AC1", price: 13.6 },
+    { code: "AC1", price: 0 },
+    { code: "SELF1", price: 11550 },
+    { code: "AC2", price: 26.9 },
+    { code: "AC2", price: 30 },
+  ];
+  const info = (code: string) =>
+    code === "AC1" ? { nhiPrice: null, hasNhiCode: true }
+    : code === "AC2" ? { nhiPrice: 26.9, hasNhiCode: true }
+    : { nhiPrice: null, hasNhiCode: false };
+  const r = classifyRows(rows, info);
+  assert.deepEqual(r.map((x) => [x.priceType, x.guessed]), [
+    ["SELF", true], ["NHI", true], ["FREE", false], ["SELF", false], ["NHI", false], ["SELF", false],
+  ]);
 });

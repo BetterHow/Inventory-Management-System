@@ -1,9 +1,10 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { num } from "./format";
 import { movementTime, round2 } from "./logic";
 import { removeStock } from "./stock";
-import { classifyPrice, type HisRow, type PriceType } from "./hisParse";
+import { classifyRows, type HisRow, type PriceType } from "./hisParse";
 
 export type PreviewRow = HisRow & {
   key: number;
@@ -11,8 +12,18 @@ export type PreviewRow = HisRow & {
   matchedBy: "map" | "nhi" | "code" | "barcode" | null;
   factor: number;
   priceType: PriceType;
+  guessed: boolean; // 系統還沒有健保價，用最低價推估為健保
   nhiPrice: number | null;
 };
+
+type PriceInfo = { nhiPrice: Prisma.Decimal | null; salePrice: Prisma.Decimal | null; priceSource: string };
+
+/** 健保價: the imported 健保署 price, or the item's own price when it follows 健保. */
+function nhiOf(i: PriceInfo): number | null {
+  if (i.nhiPrice != null) return num(i.nhiPrice);
+  if (i.priceSource === "NHI" && i.salePrice != null) return num(i.salePrice);
+  return null;
+}
 
 /** Matches each report row to an item: remembered mapping, then 健保碼, 料號, 條碼. Nothing is saved. */
 export async function previewHis(rows: HisRow[], warehouseId: number, from: string, to: string) {
@@ -31,17 +42,20 @@ export async function previewHis(rows: HisRow[], warehouseId: number, from: stri
   const byCode = new Map(items.map((i) => [up(i.code)!, i]));
   const byBarcode = new Map(items.filter((i) => i.barcode).map((i) => [up(i.barcode)!, i]));
 
-  const out: PreviewRow[] = rows.map((r, key) => {
+  const matched = rows.map((r, key) => {
     const m = mapBy.get(r.code);
     let item = m ? byId.get(m.itemId) : undefined;
     let matchedBy: PreviewRow["matchedBy"] = item ? "map" : null;
     if (!item && (item = byNhi.get(r.code))) matchedBy = "nhi";
     if (!item && (item = byCode.get(r.code))) matchedBy = "code";
     if (!item && (item = byBarcode.get(r.code))) matchedBy = "barcode";
-    // 健保價: the imported 健保署 price, or the item's own price when it follows 健保.
-    const nhi = item ? (item.nhiPrice != null ? num(item.nhiPrice) : item.priceSource === "NHI" && item.salePrice != null ? num(item.salePrice) : null) : null;
-    return { ...r, key, itemId: item?.id ?? null, matchedBy, factor: m ? num(m.factor) : 1, priceType: classifyPrice(r.price, nhi), nhiPrice: nhi };
+    return { ...r, key, item, itemId: item?.id ?? null, matchedBy, factor: m ? num(m.factor) : 1, nhiPrice: item ? nhiOf(item) : null };
   });
+  const byRowCode = new Map(matched.map((r) => [r.code, r.item]));
+  const out: PreviewRow[] = classifyRows(matched, (code) => {
+    const it = byRowCode.get(code);
+    return it ? { nhiPrice: nhiOf(it), hasNhiCode: Boolean(it.nhiCode) } : null;
+  }).map(({ item: _item, ...r }) => r);
   return {
     rows: out,
     items: items.map((i) => ({ id: i.id, code: i.code, name: i.name, unit: i.unit, nhiCode: i.nhiCode })).sort((a, b) => a.code.localeCompare(b.code)),
@@ -61,8 +75,13 @@ export async function applyHis(a: { rows: ApplyRow[]; warehouseId: number; from:
   const warnings: string[] = [];
   const date = movementTime(a.to);
   const items = new Map(
-    (await prisma.item.findMany({ where: { id: { in: rows.map((r) => r.itemId!) } }, select: { id: true, name: true, nhiPrice: true, salePrice: true, priceSource: true } })).map((i) => [i.id, i]),
+    (await prisma.item.findMany({ where: { id: { in: rows.map((r) => r.itemId!) } }, select: { id: true, name: true, nhiCode: true, nhiPrice: true, salePrice: true, priceSource: true } })).map((i) => [i.id, i]),
   );
+  const codeItem = new Map(rows.map((r) => [r.code, items.get(r.itemId!)]));
+  const typed = classifyRows(rows, (code) => {
+    const it = codeItem.get(code);
+    return it ? { nhiPrice: nhiOf(it), hasNhiCode: Boolean(it.nhiCode) } : null;
+  });
   const imp = await prisma.$transaction(async (tx) => {
     const imp = await tx.hisImport.create({
       data: {
@@ -75,11 +94,10 @@ export async function applyHis(a: { rows: ApplyRow[]; warehouseId: number; from:
       },
     });
     let qtySum = 0, revenueSum = 0, costSum = 0;
-    for (const r of rows) {
+    for (const r of typed) {
       const it = items.get(r.itemId!);
       if (!it) continue;
-      const nhi = it.nhiPrice != null ? num(it.nhiPrice) : it.priceSource === "NHI" && it.salePrice != null ? num(it.salePrice) : null;
-      const priceType = classifyPrice(r.price, nhi);
+      const priceType = r.priceType;
       const factor = r.factor > 0 ? r.factor : 1;
       const qty = round2(r.qty * factor);
       const res = await removeStock(tx, {
