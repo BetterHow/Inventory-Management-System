@@ -1,5 +1,6 @@
 "use client";
 import { CameraScan } from "./CameraScan";
+import { bindBarcode } from "@/app/(app)/items/actions";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export type PickItem = {
@@ -59,6 +60,8 @@ export function LineEditor({
   const moved = useRef(false); // arrow keys used, so Enter on an empty box picks the highlighted item
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  // Barcodes bound to an item during this visit (the item list on the page is from before that).
+  const learned = useRef(new Map<string, number>());
 
   // Which warehouse the items are for: given directly, or read from the form's 庫別 dropdown.
   const rootRef = useRef<HTMLDivElement>(null);
@@ -90,6 +93,8 @@ export function LineEditor({
   function exact(q: string): PickItem | undefined {
     const s = q.trim().toLowerCase();
     if (!s) return;
+    const known = learned.current.get(s);
+    if (known) return byId.get(known);
     return items.find((i) => i.barcode?.toLowerCase() === s || i.code.toLowerCase() === s || i.nhiCode?.toLowerCase() === s || label(i).toLowerCase() === s);
   }
 
@@ -205,9 +210,20 @@ export function LineEditor({
         <CameraScan
           onCode={(code) => {
             const it = exact(code);
-            if (!it) return { ok: false, text: `找不到條碼 ${code} 的品項。請先到「品項」把條碼填上。` };
+            if (!it) return { ok: false, text: `找不到條碼 ${code} 的品項`, unknown: code };
             add(it);
             return { ok: true, text: `已加入 ${it.name}` };
+          }}
+          bind={{
+            search: (q) => searchItems(items, q, 8),
+            bind: async (code, itemId) => {
+              const r = await bindBarcode(itemId, code);
+              const it = byId.get(itemId);
+              if (!r.ok || !it) return r;
+              learned.current.set(code.toLowerCase(), itemId);
+              add(it);
+              return { ok: true, text: `${r.text}，已加入` };
+            },
           }}
         />
         {filtered && (hiddenCount > 0 || allItems) && (

@@ -2,7 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ScanBarcode, X } from "lucide-react";
 
-type Result = { ok: boolean; text: string };
+export type ScanResult = { ok: boolean; text: string; unknown?: string }; // unknown = a code no item has yet
+type Result = ScanResult;
+type Choice = { id: number; code: string; name: string };
+/** Lets the person say which item an unrecognised barcode belongs to, right in the scanner. */
+export type ScanBind = { search: (q: string) => Choice[]; bind: (code: string, itemId: number) => Promise<Result> };
 
 /**
  * A button that opens the phone (or laptop) camera and reads barcodes.
@@ -10,7 +14,8 @@ type Result = { ok: boolean; text: string };
  * `onCode` says whether the code was recognised and what to show under the picture.
  * Browsers only allow the camera on https pages (and localhost).
  */
-export function CameraScan({ onCode, once, label = "相機掃碼", className = "btn-secondary" }: {
+export function CameraScan({ onCode, once, bind, label = "相機掃碼", className = "btn-secondary" }: {
+  bind?: ScanBind;
   onCode: (code: string) => Result | void;
   once?: boolean; // close after the first recognised code
   label?: string;
@@ -22,12 +27,14 @@ export function CameraScan({ onCode, once, label = "相機掃碼", className = "
       <button type="button" className={`${className} inline-flex items-center gap-1.5`} onClick={() => setOpen(true)}>
         <ScanBarcode className="size-4" />{label}
       </button>
-      {open && <Scanner onCode={onCode} once={once} close={() => setOpen(false)} />}
+      {open && <Scanner onCode={onCode} once={once} bind={bind} close={() => setOpen(false)} />}
     </>
   );
 }
 
-function Scanner({ onCode, once, close }: { onCode: (code: string) => Result | void; once?: boolean; close: () => void }) {
+function Scanner({ onCode, once, bind, close }: { onCode: (code: string) => Result | void; once?: boolean; bind?: ScanBind; close: () => void }) {
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState("");
   const [last, setLast] = useState<Result | null>(null);
@@ -93,6 +100,27 @@ function Scanner({ onCode, once, close }: { onCode: (code: string) => Result | v
         </div>
         <div className="min-h-12 px-4 py-2.5 text-sm">
           {error ? <span className="text-rose-600">{error}</span>
+            : last?.unknown && bind ? (
+              <div className="space-y-2">
+                <div className="text-amber-700">系統還不認得條碼 {last.unknown}。它是哪個品項？選了就會記住。</div>
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="輸入料號或品名" className="input" />
+                <ul className="max-h-40 overflow-auto">
+                  {(q.trim() ? bind.search(q) : []).slice(0, 8).map((it) => (
+                    <li key={it.id}>
+                      <button type="button" disabled={busy} className="w-full rounded px-2 py-1.5 text-left hover:bg-teal-50"
+                        onClick={async () => {
+                          setBusy(true);
+                          const r = await bind.bind(last.unknown!, it.id).catch(() => ({ ok: false, text: "儲存失敗，請再試一次" }));
+                          setBusy(false); setQ(""); setLast(r);
+                          if (once && r.ok) shut.current();
+                        }}>
+                        <span className="mr-2 text-xs text-slate-500">{it.code}</span>{it.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
             : last ? <span className={last.ok ? "text-emerald-700" : "text-rose-600"}>{last.ok ? "✓ " : "✕ "}{last.text}</span>
             : <span className="text-slate-500">{once ? "掃到就會自動帶入。" : "可以連續掃，掃完按右上角關閉。"}</span>}
         </div>

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { assertOwnerWrite, requireUser } from "@/lib/auth";
 import { attempt, done } from "@/lib/action";
-import { changes } from "@/lib/audit";
+import { audit, changes } from "@/lib/audit";
 import { writableWarehouses } from "@/lib/pickers";
 
 const ITEM_LABELS = { code: "料號", name: "品名", nhiCode: "健保碼", barcode: "條碼", spec: "規格", unit: "單位", categoryId: "類別", defaultSupplierId: "預設供應商", refPrice: "參考單價", salePrice: "健保價／售價", priceSource: "價格來源", trackBatch: "管批號", ownerWarehouseId: "所屬部門", note: "備註", active: "啟用" };
@@ -91,4 +91,24 @@ export async function saveItemSafety(itemId: number, fd: FormData) {
   });
   revalidatePath("/stock");
   return done(`/items/${itemId}`, "已儲存安全量設定", (await prisma.item.findUnique({ where: { id: itemId } }))?.name);
+}
+
+/** From the camera scanner: remember that this barcode belongs to this item. Only fills an empty 條碼. */
+export async function bindBarcode(itemId: number, code: string): Promise<{ ok: boolean; text: string }> {
+  await requireUser();
+  const barcode = code.trim();
+  if (!barcode || barcode.length > 64) return { ok: false, text: "條碼格式不對" };
+  const [item, taken] = await Promise.all([prisma.item.findUnique({ where: { id: itemId } }), prisma.item.findFirst({ where: { barcode } })]);
+  if (!item) return { ok: false, text: "找不到這個品項" };
+  if (taken && taken.id !== itemId) return { ok: false, text: `條碼 ${barcode} 已經是「${taken.name}」的了` };
+  if (item.barcode && item.barcode !== barcode) return { ok: false, text: `「${item.name}」已經有條碼 ${item.barcode}。要換的話請到「品項」修改。` };
+  try {
+    await assertOwnerWrite(item.ownerWarehouseId);
+  } catch {
+    return { ok: false, text: `「${item.name}」不是你的部門維護的，請該部門的人設定條碼` };
+  }
+  await prisma.item.update({ where: { id: itemId }, data: { barcode } });
+  await audit("/items", "設定條碼", `${item.code} ${item.name}　條碼：${barcode}`);
+  revalidatePath("/items");
+  return { ok: true, text: `已記住：${barcode} 是 ${item.name}` };
 }
