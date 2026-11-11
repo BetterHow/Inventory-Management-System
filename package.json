@@ -14,14 +14,14 @@
     "db:demo": "tsx prisma/demo.ts",
     "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && ([ \"$LOAD_DEMO_DATA\" = \"true\" ] && tsx prisma/demo.ts || true) && next build"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "bcryptjs": "^3.0.3",
     "exceljs": "^4.4.0",
     "jose": "^6.2.15",
+    "lucide-react": "^0.469.0",
     "next": "^15.5.29",
     "react": "^19.1.10",
     "react-dom": "^19.1.10",

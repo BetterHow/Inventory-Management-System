@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   // Direct (non-pooled) connection for migrations. Neon on Vercel sets both.
   directUrl = env("DATABASE_URL_UNPOOLED")
@@ -15,15 +15,32 @@ enum Role {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  name         String
-  passwordHash String
-  role         Role     @default(STAFF)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id                 Int        @id @default(autoincrement())
+  username           String     @unique
+  name               String
+  passwordHash       String
+  role               Role       @default(STAFF)
+  active             Boolean    @default(true)
+  // 負責庫別：列表與新單據預設只顯示／使用這個庫別（仍可切換到其他庫別）
+  defaultWarehouseId Int?
+  defaultWarehouse   Warehouse? @relation(fields: [defaultWarehouseId], references: [id])
+  // 行政：可查看與處理所有部門的發票，不受部門權限限制
+  invoiceClerk       Boolean    @default(false)
+  createdAt          DateTime   @default(now())
 
   movements StockMovement[]
+  access    UserWarehouseAccess[]
+}
+
+// 部門權限：只記「限制」。沒有紀錄 = 可看可改，所以預設全部開放
+model UserWarehouseAccess {
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  warehouseId Int
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  level       String // READ = 只能看；NONE = 不開放
+
+  @@id([userId, warehouseId])
 }
 
 // 庫別：依部門分開管理庫存（藥局、護理部、眼鏡部⋯）
@@ -38,6 +55,8 @@ model Warehouse {
   batches   Batch[]
   movements StockMovement[]
   settings  ItemWarehouseSetting[]
+  users     User[]
+  access    UserWarehouseAccess[]
 }
 
 model Category {
@@ -56,6 +75,9 @@ model Supplier {
   paymentTerms String?
   note         String?
   active       Boolean @default(true)
+  category     String? // 供應商分類（自由輸入，例：藥商、耗材、鏡片）
+  // 所屬部門：由該部門維護；空白 = 全診所共用
+  ownerWarehouseId Int?
 
   items    Item[]
   receipts Receipt[]
@@ -75,14 +97,23 @@ model Item {
   defaultSupplierId Int?
   defaultSupplier   Supplier? @relation(fields: [defaultSupplierId], references: [id])
   refPrice          Decimal?  @db.Decimal(14, 2) // 參考單價（含稅）
+  salePrice         Decimal?  @db.Decimal(14, 2) // 健保價／售價（每單位），用來算價差；目前生效的價格
+  priceSource       PriceSource @default(MANUAL) // NHI = 跟著健保署價格自動更新
+  nhiPrice          Decimal?  @db.Decimal(14, 2) // 最近一次匯入的健保參考價
+  nhiPriceFrom      DateTime? @db.Date // 該健保價的生效日
+  nhiCheckedAt      DateTime? // 最近一次匯入時有對到這個品項
   trackBatch        Boolean   @default(true) // 是否管批號效期
+  ownerWarehouseId  Int? // 所屬部門：由該部門維護；空白 = 全診所共用
   note              String?
   active            Boolean   @default(true)
   createdAt         DateTime  @default(now())
 
-  batches   Batch[]
-  movements StockMovement[]
-  settings  ItemWarehouseSetting[]
+  batches      Batch[]
+  movements    StockMovement[]
+  settings     ItemWarehouseSetting[]
+  receiptLines ReceiptLine[]
+  prices       ItemPrice[]
+  hisCodes     HisCodeMap[]
 
   @@index([barcode])
   @@index([nhiCode])
@@ -143,7 +174,9 @@ model StockMovement {
   qty         Decimal      @db.Decimal(12, 2) // 正數=增加，負數=減少
   unitCost    Decimal      @default(0) @db.Decimal(14, 4)
   source      String       @default("MANUAL") // MANUAL / HIS / SCANNER
-  refType     String? // RECEIPT / CONSUMPTION / TRANSFER / STOCKTAKE
+  revenue     Decimal?     @db.Decimal(14, 2) // HIS 匯入的實收金額（依報表合計）；空白 = 用品項的健保價／售價推算
+  priceType   String? // HIS 匯入時自動歸類：NHI 健保 / SELF 自費 / FREE 贈送
+  refType     String? // RECEIPT / CONSUMPTION / TRANSFER / STOCKTAKE / HIS_IMPORT
   refId       Int?
   note        String?
   userId      Int?
@@ -207,6 +240,7 @@ model ReceiptLine {
   receiptId  Int
   receipt    Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   itemId     Int
+  item       Item      @relation(fields: [itemId], references: [id])
   qty        Decimal   @db.Decimal(12, 2)
   freeQty    Decimal   @default(0) @db.Decimal(12, 2) // 贈品數量
   unitPrice  Decimal   @default(0) @db.Decimal(14, 4)
@@ -284,4 +318,83 @@ model StocktakeLine {
 model Setting {
   key   String @id
   value String
+}
+
+enum PriceSource {
+  MANUAL
+  NHI
+}
+
+// 健保價／售價的歷史：統計時，每筆耗用用當天有效的價格
+model ItemPrice {
+  id            Int         @id @default(autoincrement())
+  itemId        Int
+  item          Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  price         Decimal     @db.Decimal(14, 2)
+  effectiveFrom DateTime    @db.Date
+  source        PriceSource
+  createdAt     DateTime    @default(now())
+
+  @@index([itemId, effectiveFrom])
+}
+
+// HIS（方鼎）每日耗用報表匯入：一次匯入 = 一份報表
+model HisImport {
+  id          Int       @id @default(autoincrement())
+  dateFrom    DateTime  @db.Date
+  dateTo      DateTime  @db.Date
+  warehouseId Int
+  fileName    String?
+  rowCount    Int       @default(0)
+  qty         Decimal   @default(0) @db.Decimal(14, 2)
+  revenue     Decimal   @default(0) @db.Decimal(14, 2)
+  cost        Decimal   @default(0) @db.Decimal(14, 2)
+  createdById Int?
+  createdAt   DateTime  @default(now())
+
+  lines HisImportLine[]
+
+  @@index([dateTo])
+}
+
+model HisImportLine {
+  id        Int       @id @default(autoincrement())
+  importId  Int
+  import    HisImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  hisCode   String
+  hisName   String
+  itemId    Int?
+  unitPrice Decimal   @db.Decimal(14, 2)
+  hisQty    Decimal   @db.Decimal(12, 2) // 報表上的用量（HIS 單位）
+  qty       Decimal   @db.Decimal(12, 2) // 換算成庫存單位後扣的數量
+  amount    Decimal   @db.Decimal(14, 2) // 報表合計＝收入
+  hisCost   Decimal?  @db.Decimal(14, 2) // 報表上的成本（參考）
+  rxCount   Int?      // 開藥次
+  priceType String    // NHI / SELF / FREE
+  cost      Decimal   @default(0) @db.Decimal(14, 2) // 依批次進價算出的成本
+
+  @@index([itemId])
+}
+
+// HIS 藥品代號 → 系統品項。健保碼相同時自動對到，其餘第一次匯入時指定一次就記住
+model HisCodeMap {
+  hisCode String @id
+  itemId  Int
+  item    Item    @relation(fields: [itemId], references: [id])
+  factor  Decimal @default(1) @db.Decimal(12, 4) // HIS 1 單位 = 庫存幾單位
+}
+
+// 操作紀錄：誰在什麼時候做了什麼。只新增，不修改
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  at        DateTime @default(now())
+  userId    Int?
+  userName  String   @default("")
+  area      String // 功能：進貨單、品項、使用者⋯
+  action    String // 做了什麼（畫面上顯示的那句話）
+  detail    String? // 對象與變更內容
+  path      String? // 相關頁面
+
+  @@index([at])
+  @@index([userId, at])
 }

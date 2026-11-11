@@ -2,8 +2,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
-import { attempt } from "@/lib/action";
+import { assertInvoiceWrite, requireUser } from "@/lib/auth";
+import { attempt, done } from "@/lib/action";
+import { changes } from "@/lib/audit";
 import { UserError, bool, intVal, optNum, optStr, str } from "@/lib/form";
 import { dateOnly, num } from "@/lib/format";
 import { sum, todayTaipei } from "@/lib/logic";
@@ -17,6 +18,7 @@ export async function createInvoice(fd: FormData) {
     if (!number) throw new UserError("請輸入發票號碼");
     const receiptIds = fd.getAll("receiptIds").map(Number).filter(Boolean);
     const receipts = await prisma.receipt.findMany({ where: { id: { in: receiptIds }, supplierId } });
+    await assertInvoiceWrite(receipts.map((r) => r.warehouseId));
     const amount = optNum(fd, "amount") ?? sum(receipts.map((r) => num(r.totalAmount)));
     const inv = await prisma.invoice.create({
       data: {
@@ -32,16 +34,19 @@ export async function createInvoice(fd: FormData) {
     id = inv.id;
   });
   revalidatePath("/invoices");
-  redirect(`/invoices/${id}?ok=` + encodeURIComponent("已建立發票"));
+  return done(`/invoices/${id}`, "已建立發票", `發票 ${str(fd, "number")}`);
 }
 
 export async function updateInvoice(id: number, fd: FormData) {
   await requireUser();
+  let detail = "";
   await attempt(`/invoices/${id}`, async () => {
     const number = str(fd, "number");
     if (!number) throw new UserError("請輸入發票號碼");
     const paid = bool(fd, "paid");
-    await prisma.invoice.update({
+    const before = await prisma.invoice.findUniqueOrThrow({ where: { id }, include: { receipts: { select: { warehouseId: true } } } });
+    await assertInvoiceWrite(before.receipts.map((r) => r.warehouseId));
+    const after = await prisma.invoice.update({
       where: { id },
       data: {
         number,
@@ -53,15 +58,20 @@ export async function updateInvoice(id: number, fd: FormData) {
         paidAt: paid ? dateOnly(str(fd, "paidAt") || todayTaipei()) : null,
       },
     });
+    detail = `發票 ${after.number}　${changes(before, after, { number: "號碼", date: "日期", amount: "金額", taxAmount: "稅額", paid: "已付款", paidAt: "付款日", note: "備註" }) || "沒有變更"}`;
   });
   revalidatePath("/invoices");
-  redirect(`/invoices/${id}?ok=` + encodeURIComponent("已儲存"));
+  return done(`/invoices/${id}`, "已修改發票", detail);
 }
 
 export async function deleteInvoice(id: number) {
   await requireUser();
+  await attempt(`/invoices/${id}`, async () => {
+    const linked = await prisma.receipt.findMany({ where: { invoiceId: id }, select: { warehouseId: true } });
+    await assertInvoiceWrite(linked.map((r) => r.warehouseId));
+  });
   await prisma.receipt.updateMany({ where: { invoiceId: id }, data: { invoiceId: null } });
-  await prisma.invoice.delete({ where: { id } });
+  const inv = await prisma.invoice.delete({ where: { id } });
   revalidatePath("/invoices");
-  redirect("/invoices?ok=" + encodeURIComponent("已刪除發票，相關進貨單改回未對發票"));
+  return done("/invoices", "已刪除發票，相關進貨單改回未對發票", `發票 ${inv.number}，金額 ${inv.amount}`);
 }

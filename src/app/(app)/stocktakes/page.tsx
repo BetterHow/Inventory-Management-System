@@ -5,21 +5,23 @@ import { Flash } from "@/components/Flash";
 import { fmtDateTime } from "@/lib/format";
 import { activeWarehouses } from "@/lib/pickers";
 import { createStocktake } from "./actions";
+import { getAccess, getUnit } from "@/lib/auth";
 
 export default async function StocktakesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
   const [list, warehouses, categories] = await Promise.all([
-    prisma.stocktake.findMany({ orderBy: { id: "desc" }, take: 100 }),
+    prisma.stocktake.findMany({ where: { warehouseId: { notIn: (await getAccess()).hidden } }, orderBy: { id: "desc" }, take: 100 }),
     activeWarehouses(),
     prisma.category.findMany({ orderBy: { sortOrder: "asc" } }),
   ]);
+  const [unit, access] = await Promise.all([getUnit(), getAccess()]);
   const wh = new Map(warehouses.map((w) => [w.id, w.name]));
   return (
     <div className="space-y-4">
       <PageHeader title="盤點" />
       <Flash sp={sp} />
       <form action={createStocktake} className="card grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
-        <Field label="庫別"><select name="warehouseId" className="input">{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+        <Field label="庫別"><select name="warehouseId" defaultValue={unit} className="input">{warehouses.filter((w) => access.canWrite(w.id)).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
         <Field label="類別（空白=全部）">
           <select name="categoryId" className="input"><option value="">全部</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         </Field>
@@ -37,7 +39,7 @@ export default async function StocktakesPage({ searchParams }: { searchParams: P
                   <td>{wh.get(s.warehouseId)}</td>
                   <td>{fmtDateTime(s.date)}</td>
                   <td>{s.status === "DONE" ? `已完成 ${fmtDateTime(s.completedAt)}` : <span className="text-amber-700">盤點中</span>}</td>
-                  <td>{s.note}</td>
+                  <td className="wrap">{s.note}</td>
                 </tr>
               ))}
             </tbody>

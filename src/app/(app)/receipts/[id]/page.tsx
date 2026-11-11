@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertRead } from "@/lib/auth";
 import { PageHeader, Field } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { fmtDate, fmtDateTime, fmtMoney, fmtQty, RECEIPT_STATUS_LABEL, RECEIPT_STATUS_COLOR as STATUS_COLOR } from "@/lib/format";
@@ -17,6 +18,7 @@ export default async function ReceiptPage({ params, searchParams }: {
     include: { supplier: true, invoice: true, lines: true },
   });
   if (!r) notFound();
+  await assertRead(r.warehouseId);
   const [items, warehouse, users, openInvoices, settings] = await Promise.all([
     prisma.item.findMany({ where: { id: { in: r.lines.map((l) => l.itemId) } } }),
     prisma.warehouse.findUnique({ where: { id: r.warehouseId } }),

@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { assertRead, getAccess } from "@/lib/auth";
+import { writableWarehouses, ownerVisible } from "@/lib/pickers";
 import { PageHeader, Field } from "@/components/ui";
 import { ItemForm } from "@/components/ItemForm";
 import { Flash } from "@/components/Flash";
-import { num } from "@/lib/format";
+import { num, fmtDate, fmtMoney } from "@/lib/format";
 import { updateItem, saveItemSafety } from "../actions";
 
 export default async function EditItemPage({ params, searchParams }: {
@@ -13,12 +15,16 @@ export default async function EditItemPage({ params, searchParams }: {
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const item = await prisma.item.findUnique({ where: { id: Number(id) }, include: { settings: true } });
+  const item = await prisma.item.findUnique({ where: { id: Number(id) }, include: { settings: true, prices: { orderBy: { effectiveFrom: "desc" }, take: 20 } } });
   if (!item) notFound();
+  if (item.ownerWarehouseId) await assertRead(item.ownerWarehouseId);
+  const [access, owners] = await Promise.all([getAccess(), writableWarehouses()]);
+  const readOnly = !!item.ownerWarehouseId && !access.canWrite(item.ownerWarehouseId);
+  const ownerName = item.ownerWarehouseId ? (await prisma.warehouse.findUnique({ where: { id: item.ownerWarehouseId } }))?.name : undefined;
   const [categories, suppliers, warehouses] = await Promise.all([
     prisma.category.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.supplier.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
-    prisma.warehouse.findMany({ where: { active: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.supplier.findMany({ where: { active: true, ...(await ownerVisible()) }, orderBy: { name: "asc" } }),
+    writableWarehouses(),
   ]);
   const manual = new Map(item.settings.map((s) => [s.warehouseId, s.manualMonthlyUsage]));
 
@@ -28,7 +34,25 @@ export default async function EditItemPage({ params, searchParams }: {
         <Link href={`/stock/${item.id}`} className="btn-secondary">看庫存與流水帳</Link>
       </PageHeader>
       <Flash sp={sp} />
-      <ItemForm item={item} categories={categories} suppliers={suppliers} action={updateItem.bind(null, item.id)} />
+      <ItemForm item={item} categories={categories} suppliers={suppliers} action={updateItem.bind(null, item.id)} owners={owners} readOnly={readOnly} ownerName={ownerName} />
+      {item.prices.length > 0 && (
+        <section className="card max-w-3xl p-0">
+          <h2 className="px-5 pb-1 pt-5 font-semibold">健保價／售價歷史</h2>
+          <p className="px-5 pb-3 text-xs text-slate-500">統計分析算價差時，每筆耗用用當天有效的價格。</p>
+          <table className="table">
+            <thead><tr><th>生效日</th><th className="num">價格</th><th>來源</th></tr></thead>
+            <tbody>
+              {item.prices.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.effectiveFrom.getUTCFullYear() <= 2000 ? "最早（第一次設定）" : fmtDate(p.effectiveFrom, true)}</td>
+                  <td className="num">{fmtMoney(p.price)}</td>
+                  <td>{p.source === "NHI" ? "健保價匯入" : "手動輸入"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
       <form action={saveItemSafety.bind(null, item.id)} className="card max-w-3xl">
         <h2 className="mb-1 font-semibold">安全量（每月用量）</h2>
         <p className="mb-3 text-xs text-slate-500">

@@ -56,7 +56,10 @@ export async function addStock(
  * Take stock out, first-expiring batch first (or from one chosen batch).
  * Negative stock is allowed; the returned `shortfall` tells the caller to warn the user.
  */
-export async function removeStock(tx: Tx, a: Common & { qty: number; batchId?: number | null }) {
+export async function removeStock(
+  tx: Tx,
+  a: Common & { qty: number; batchId?: number | null; revenue?: number | null; priceType?: string | null },
+) {
   const qty = round2(a.qty);
   let allocations: { batchId: number | null; qty: number }[];
   let shortfall = 0;
@@ -76,7 +79,14 @@ export async function removeStock(tx: Tx, a: Common & { qty: number; batchId?: n
   }
 
   const moved: { batchId: number; qty: number; unitCost: number }[] = [];
-  for (const al of allocations) {
+  // HIS revenue is split over the batches in proportion to quantity; the last one takes the rounding.
+  let revenueLeft = a.revenue ?? null;
+  for (const [i, al] of allocations.entries()) {
+    let revenue: number | null = null;
+    if (revenueLeft !== null) {
+      revenue = i === allocations.length - 1 || !qty ? revenueLeft : round2(((a.revenue ?? 0) * al.qty) / qty);
+      revenueLeft = round2(revenueLeft - revenue);
+    }
     let batchId = al.batchId;
     let unitCost = 0;
     if (batchId === null) {
@@ -100,6 +110,8 @@ export async function removeStock(tx: Tx, a: Common & { qty: number; batchId?: n
         qty: -al.qty,
         unitCost,
         source: a.source ?? "MANUAL",
+        revenue,
+        priceType: a.priceType ?? null,
         refType: a.refType,
         refId: a.refId,
         note: a.note ?? undefined,
