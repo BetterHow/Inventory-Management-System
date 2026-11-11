@@ -74,8 +74,6 @@ export default async function Dashboard() {
   const monthStart = parseTaipeiDate(`${p.y}-${String(p.m).padStart(2, "0")}-01`);
   const monthStartDate = new Date(Date.UTC(p.y, p.m - 1, 1));
   const [unit, user] = await Promise.all([getUnit(), requireUser()]);
-  const hour = new Date(Date.now() + 8 * 3600_000).getUTCHours();
-  const greeting = hour < 11 ? "早安" : hour < 18 ? "午安" : "晚安";
   const wh = unit ? { warehouseId: unit } : {};
   const unitName = unit ? (await prisma.warehouse.findUnique({ where: { id: unit } }))?.name : null;
   const monthFrom = `${p.y}-${String(p.m).padStart(2, "0")}-01`;
@@ -101,8 +99,7 @@ export default async function Dashboard() {
     <div className="space-y-7">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{greeting}，{user.name}</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="text-sm text-slate-500">
             目前查看 <span className="font-medium text-teal-700">{unitName ?? "全部單位"}</span>
             {low.length + expiring.length + todo === 0 ? "，今天沒有待處理的事項。" : `，有 ${low.length + expiring.length + todo} 件事項需要留意。`}
           </p>
