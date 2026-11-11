@@ -18,7 +18,7 @@ export default async function ConsumptionPage({ searchParams }: { searchParams: 
   });
   return (
     <div>
-      <PageHeader title="耗用紀錄"><LinkButton href={wid ? `/consumption/new?warehouse=${wid}` : "/consumption/new"}>＋ 登記耗用</LinkButton></PageHeader>
+      <PageHeader title="耗用紀錄"><LinkButton href="/consumption/import" secondary>匯入 HIS 報表</LinkButton><LinkButton href={wid ? `/consumption/new?warehouse=${wid}` : "/consumption/new"}>＋ 登記耗用</LinkButton></PageHeader>
       <Flash sp={sp} />
       <div className="mb-3"><WarehousePills path="/consumption" sp={sp} warehouses={warehouses} current={wid} mine={unit} /></div>
       <div className="card overflow-x-auto p-0">
