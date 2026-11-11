@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 import { attempt } from "@/lib/action";
 import { UserError, bool, intVal, optStr, str } from "@/lib/form";
 import { PageHeader } from "@/components/ui";
@@ -17,6 +18,7 @@ async function addWarehouse(fd: FormData) {
   "use server";
   await requireUser();
   await attempt("/warehouses", () => prisma.warehouse.create({ data: read(fd) }));
+  await audit("/warehouses", "已新增庫別", String(fd.get("name") ?? ""));
   revalidatePath("/", "layout");
 }
 
@@ -24,6 +26,7 @@ async function saveWarehouse(id: number, fd: FormData) {
   "use server";
   await requireUser();
   await attempt("/warehouses", () => prisma.warehouse.update({ where: { id }, data: read(fd) }));
+  await audit("/warehouses", "已修改庫別", String(fd.get("name") ?? ""));
   revalidatePath("/", "layout");
 }
 

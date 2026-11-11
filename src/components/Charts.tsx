@@ -161,3 +161,28 @@ export function RankBars({ rows, color }: { rows: { label: string; value: number
     </ul>
   );
 }
+
+/** One 100% bar split into parts, with a legend underneath (share of a whole). */
+export function ShareBar({ parts }: { parts: { label: string; value: number; color: string }[] }) {
+  const total = parts.reduce((s, p) => s + Math.max(p.value, 0), 0);
+  if (!total) return <div className="h-3 rounded-full bg-slate-100" />;
+  return (
+    <div>
+      <div className="flex h-3 gap-0.5 overflow-hidden rounded-full">
+        {parts.filter((p) => p.value > 0).map((p) => (
+          <div key={p.label} title={`${p.label}：${fmt(p.value)}（${((p.value / total) * 100).toFixed(1)}%）`}
+            style={{ width: `${(p.value / total) * 100}%`, background: p.color }} />
+        ))}
+      </div>
+      <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+        {parts.map((p) => (
+          <span key={p.label} className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full" style={{ background: p.color }} />
+            {p.label}<span className="tabular-nums text-slate-800">{fmt(p.value)}</span>
+            <span className="text-slate-400">{((Math.max(p.value, 0) / total) * 100).toFixed(0)}%</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}

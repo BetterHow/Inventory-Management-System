@@ -1,7 +1,7 @@
 import { PageHeader, Field, CancelLink } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { WarehouseLines } from "@/components/LineEditor";
-import { pickItems, pickStock, activeWarehouses, itemsByWarehouse } from "@/lib/pickers";
+import { pickItems, pickStock, writableWarehouses, itemsByWarehouse } from "@/lib/pickers";
 import { todayTaipei } from "@/lib/logic";
 import { createConsumption } from "../actions";
 import { SuggestInput } from "@/components/SuggestInput";
@@ -10,7 +10,7 @@ import { getUnit } from "@/lib/auth";
 
 export default async function NewConsumptionPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const [items, { batches, stock }, warehouses, settings, byWh] = await Promise.all([pickItems(), pickStock(), activeWarehouses(), getSettings(), itemsByWarehouse()]);
+  const [items, { batches, stock }, warehouses, settings, byWh] = await Promise.all([pickItems(), pickStock(), writableWarehouses(), getSettings(), itemsByWarehouse()]);
   const unit = await getUnit();
   return (
     <div>

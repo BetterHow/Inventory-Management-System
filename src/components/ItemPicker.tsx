@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CameraScan } from "./CameraScan";
 import { searchItems, type PickItem } from "./LineEditor";
 
 const byCode = (a: PickItem, b: PickItem) => a.code.localeCompare(b.code, "en", { numeric: true });
@@ -70,7 +71,8 @@ export function ItemPicker({ name, items, required, itemsByWh }: {
   }
 
   return (
-    <div className="relative">
+    <div className="flex gap-2">
+    <div className="relative min-w-0 flex-1">
       <input
         ref={inputRef}
         name={name}
@@ -149,6 +151,18 @@ export function ItemPicker({ name, items, required, itemsByWh }: {
           )}
         </ul>
       )}
+    </div>
+      <CameraScan
+        once
+        label=""
+        className="btn-secondary px-2.5"
+        onCode={(code) => {
+          const it = items.find((i) => i.barcode === code || i.code.toLowerCase() === code.toLowerCase());
+          if (!it) return { ok: false, text: `找不到條碼 ${code} 的品項。請先到「品項」把條碼填上。` };
+          pick(it);
+          return { ok: true, text: it.name };
+        }}
+      />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { SIDEBAR_COOKIE } from "@/lib/prefs";
 import { ThemeToggle } from "./ThemeToggle";
 import {
   LayoutDashboard, ClipboardMinus, PackagePlus, ShoppingCart, Receipt, Boxes, ArrowLeftRight, ClipboardCheck,
-  BarChart3, PieChart, Pill, Truck, Tags, Building2, Users, Settings, LogOut, ChevronsLeft, ChevronsRight, Menu, X, Package,
+  BarChart3, PieChart, Pill, Truck, Tags, Building2, Users, Settings, LogOut, History, ChevronsLeft, ChevronsRight, Menu, X, Package,
   type LucideIcon,
 } from "lucide-react";
 
@@ -48,12 +48,14 @@ export const NAV: NavGroup[] = [
     title: "系統",
     links: [
       { href: "/users", label: "使用者", icon: Users, admin: true },
+      { href: "/audit", label: "操作紀錄", icon: History, admin: true },
       { href: "/settings", label: "系統設定", icon: Settings, admin: true },
     ],
   },
 ];
 
-export default function Sidebar({ userName, isAdmin, clinicName, logout, initialCollapsed = false, unit, units }: {
+export default function Sidebar({ userName, isAdmin, clinicName, logout, initialCollapsed = false, unit, units, allowAll = true }: {
+  allowAll?: boolean;
   unit: number | null;
   units: { id: number; name: string }[];
   initialCollapsed?: boolean;
@@ -91,7 +93,7 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
       className="select-plain w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-3 text-sm font-medium text-slate-800 hover:border-slate-300 focus:border-teal-500 focus:outline-none focus:ring-3 focus:ring-teal-500/15"
     >
       {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-      <option value="all">全部單位</option>
+      {allowAll && <option value="all">全部單位</option>}
     </select>
   );
   // Desktop only: fold the sidebar into a narrow strip. Remembered in a cookie so it stays folded.
@@ -215,10 +217,10 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
             <span className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600" title={userName}>
               {userName.slice(0, 1)}
             </span>
-            <div className={`min-w-0 flex-1 ${collapsed ? "md:hidden" : ""}`}>
+            <Link href="/account" title="我的帳號：修改密碼" onClick={() => setOpen(false)} className={`min-w-0 flex-1 rounded-md hover:text-teal-700 ${collapsed ? "md:hidden" : ""}`}>
               <div className="truncate text-sm font-medium text-slate-800">{userName}</div>
-              <div className="text-xs text-slate-500">{isAdmin ? "管理員" : "使用者"}</div>
-            </div>
+              <div className="text-xs text-slate-500">{isAdmin ? "管理員" : "使用者"}・改密碼</div>
+            </Link>
             <ThemeToggle compact />
             <form action={logout}>
               <button title="登出" aria-label="登出" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">

@@ -10,6 +10,8 @@
   --viz-1: #2a78d6;
   --viz-2: #eb6834;
   --viz-3: #1baf7a;
+  --viz-4: #8b5cf6;
+  --viz-5: #94a3b8;
 }
 
 /* Dark mode: the whole palette is re-stepped here, so pages don't need their own dark styles.
@@ -22,6 +24,8 @@ html.dark {
   --viz-1: #3987e5;
   --viz-2: #d95926;
   --viz-3: #199e70;
+  --viz-4: #a78bfa;
+  --viz-5: #64748b;
   --color-slate-50: oklch(24% 0.03 257);
   --color-slate-100: oklch(27.5% 0.03 257);
   --color-slate-200: oklch(32% 0.03 257);

@@ -141,7 +141,7 @@ export default async function Dashboard() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title={`需要補貨${unitName ? `・${unitName}` : ""}`} icon={ClipboardCheck} href="/stock?status=LT1">
+        <Panel title={`需要補貨${unitName ? `・${unitName}` : ""}`} icon={ClipboardCheck} href="/purchase-list">
           {lowList.length === 0 ? <AllGood text="庫存都充足" /> : (
             <table className="table">
               <tbody>

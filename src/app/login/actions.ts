@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { SESSION_COOKIE, SESSION_MAX_AGE, REMEMBER_MAX_AGE, signSession } from "@/lib/session";
 import { UNIT_COOKIE } from "@/lib/prefs";
+import { audit } from "@/lib/audit";
 
 export async function login(_prev: string | null, fd: FormData): Promise<string | null> {
   const username = String(fd.get("username") ?? "").trim();
@@ -23,6 +24,7 @@ export async function login(_prev: string | null, fd: FormData): Promise<string 
     maxAge,
     path: "/",
   });
+  await audit("/login", "登入", null, user);
   store.delete(UNIT_COOKIE); // start from this person's own 負責庫別
   redirect("/");
 }

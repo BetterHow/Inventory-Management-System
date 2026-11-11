@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { assertWrite, requireUser } from "@/lib/auth";
 import { attempt, done } from "@/lib/action";
 import { UserError, intVal, optInt, optStr, str } from "@/lib/form";
 import { addStock, nextNumber, removeStock, stockByItem } from "@/lib/stock";
@@ -14,6 +14,7 @@ export async function createStocktake(fd: FormData) {
   let id = 0;
   await attempt("/stocktakes", async () => {
     const warehouseId = intVal(fd, "warehouseId");
+    await assertWrite(warehouseId);
     const categoryId = optInt(fd, "categoryId");
     await prisma.$transaction(async (tx) => {
       const stock = await stockByItem(tx, warehouseId);
@@ -41,6 +42,7 @@ export async function saveCounts(id: number, fd: FormData) {
   await attempt(`/stocktakes/${id}`, async () => {
     await prisma.$transaction(async (tx) => {
       const st = await tx.stocktake.findUniqueOrThrow({ where: { id }, include: { lines: true } });
+      await assertWrite(st.warehouseId);
       if (st.status === "DONE") throw new UserError("這張盤點單已完成");
       for (const l of st.lines) {
         const v = str(fd, `c_${l.id}`);
@@ -74,12 +76,14 @@ export async function saveCounts(id: number, fd: FormData) {
     });
   });
   revalidatePath("/stocktakes");
-  return done(`/stocktakes/${id}`, finish ? "盤點完成，已調整庫存" : "已暫存");
+  const st = await prisma.stocktake.findUnique({ where: { id }, select: { number: true } });
+  return done(`/stocktakes/${id}`, finish ? "盤點完成，已調整庫存" : "已暫存盤點", st?.number);
 }
 
 export async function deleteStocktake(id: number) {
   await requireUser();
   const st = await prisma.stocktake.findUniqueOrThrow({ where: { id } });
+  await attempt(`/stocktakes/${id}`, () => assertWrite(st.warehouseId));
   if (st.status === "DONE") redirect(`/stocktakes/${id}?error=` + encodeURIComponent("已完成的盤點不能刪除"));
   await prisma.stocktake.delete({ where: { id } });
   redirect("/stocktakes");

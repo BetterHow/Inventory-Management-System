@@ -1,9 +1,14 @@
 import type { Item, Category, Supplier } from "@prisma/client";
-import { Field, CancelLink } from "./ui";
+import { Field, CancelLink, OwnerSelect } from "./ui";
 import { num, fmtDate } from "@/lib/format";
 import { PriceFields } from "./PriceFields";
+import { BarcodeField } from "./BarcodeField";
 
-export function ItemForm({ item, categories, suppliers, action, cancelHref = "/items" }: {
+export function ItemForm({ item, categories, suppliers, action, cancelHref = "/items", owners, defaultOwner, readOnly, ownerName }: {
+  owners: { id: number; name: string }[]; // departments this person may assign
+  defaultOwner?: number | null;
+  readOnly?: boolean; // owned by a department this person can only view
+  ownerName?: string;
   item?: Item;
   categories: Category[];
   suppliers: Supplier[];
@@ -22,7 +27,7 @@ export function ItemForm({ item, categories, suppliers, action, cancelHref = "/i
       </Field>
       <Field label="單位"><input name="unit" className="input" defaultValue={item?.unit ?? "個"} /></Field>
       <Field label="健保碼"><input name="nhiCode" className="input" defaultValue={item?.nhiCode ?? ""} /></Field>
-      <Field label="國際條碼（可用掃描槍）"><input name="barcode" className="input" defaultValue={item?.barcode ?? ""} /></Field>
+      <Field label="國際條碼（掃描槍或相機）"><BarcodeField defaultValue={item?.barcode ?? ""} /></Field>
       <Field label="規格"><input name="spec" className="input" defaultValue={item?.spec ?? ""} /></Field>
       <Field label="參考單價（含稅）">
         <input name="refPrice" type="number" step="0.01" className="input" defaultValue={item?.refPrice ? num(item.refPrice) : ""} />
@@ -34,6 +39,7 @@ export function ItemForm({ item, categories, suppliers, action, cancelHref = "/i
         </select>
       </Field>
       <Field label="備註"><input name="note" className="input" defaultValue={item?.note ?? ""} /></Field>
+      <OwnerSelect value={item ? item.ownerWarehouseId : defaultOwner} warehouses={owners} locked={readOnly ? ownerName : undefined} />
       <PriceFields
         source={item?.priceSource ?? (item?.nhiCode ? "NHI" : "MANUAL")}
         salePrice={item?.salePrice == null ? null : num(item.salePrice)}
@@ -47,7 +53,10 @@ export function ItemForm({ item, categories, suppliers, action, cancelHref = "/i
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="active" defaultChecked={item?.active ?? true} /> 使用中（取消勾選即停用）
       </label>
-      <div className="flex gap-2 sm:col-span-2"><button className="btn">儲存</button><CancelLink href={cancelHref} /></div>
+      <div className="flex items-center gap-2 sm:col-span-2">
+        {readOnly ? <span className="text-sm text-amber-700">這個品項由「{ownerName}」維護，你只能查看。</span> : <button className="btn">儲存</button>}
+        <CancelLink href={cancelHref} label={readOnly ? "返回" : "取消"} />
+      </div>
     </form>
   );
 }

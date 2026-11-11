@@ -1,4 +1,6 @@
+import { ownerVisible } from "@/lib/pickers";
 import { prisma } from "@/lib/db";
+import { getAccess } from "@/lib/auth";
 import { PageHeader, Field, CancelLink } from "@/components/ui";
 import { AutoForm } from "@/components/AutoForm";
 
@@ -10,10 +12,13 @@ import { createInvoice } from "../actions";
 export default async function NewInvoicePage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
   const supplierId = sp.supplier ? Number(sp.supplier) : null;
-  const suppliers = await prisma.supplier.findMany({ where: { active: true }, orderBy: { name: "asc" } });
+  const [access, allWh] = await Promise.all([getAccess(), prisma.warehouse.findMany({ select: { id: true, name: true } })]);
+  const writable = allWh.filter((w) => access.canWrite(w.id)).map((w) => w.id);
+  const whName = new Map(allWh.map((w) => [w.id, w.name]));
+  const suppliers = await prisma.supplier.findMany({ where: { active: true, ...(await ownerVisible()) }, orderBy: { name: "asc" } });
   const receipts = supplierId
     ? await prisma.receipt.findMany({
-        where: { supplierId, invoiceId: null, status: { not: "CANCELLED" } },
+        where: { supplierId, invoiceId: null, status: { not: "CANCELLED" }, ...(access.clerk ? {} : { warehouseId: { in: writable } }) },
         orderBy: { date: "asc" },
       })
     : [];
@@ -41,7 +46,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
                   {receipts.map((r) => (
                     <tr key={r.id}>
                       <td className="w-8"><input type="checkbox" name="receiptIds" value={r.id} defaultChecked /></td>
-                      <td>{r.number}</td><td>{fmtDate(r.date, true)}</td><td className="num">{fmtMoney(r.totalAmount)}</td>
+                      <td>{r.number}</td><td>{whName.get(r.warehouseId)}</td><td>{fmtDate(r.date, true)}</td><td className="num">{fmtMoney(r.totalAmount)}</td>
                     </tr>
                   ))}
                 </tbody>

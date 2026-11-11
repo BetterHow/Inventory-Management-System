@@ -2,7 +2,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { assertWrite, getAccess, requireUser } from "@/lib/auth";
+import { linesText } from "@/lib/audit";
 import { attempt, done } from "@/lib/action";
 import { UserError, intVal, json, optStr, str } from "@/lib/form";
 import { addStock, nextNumber, removeStock } from "@/lib/stock";
@@ -12,14 +13,20 @@ import type { Line } from "@/components/LineEditor";
 export async function createTransfer(fd: FormData) {
   const user = await requireUser();
   const warnings: string[] = [];
+  let detail = "";
   await attempt("/transfers/new", async () => {
     const from = intVal(fd, "warehouseId");
     const to = intVal(fd, "toWarehouseId");
     if (from === to) throw new UserError("調出與調入庫別不能相同");
+    // Sending needs 可改 on the source; the destination only has to be visible to this person.
+    await assertWrite(from);
+    if (!(await getAccess()).canRead(to)) throw new UserError("沒有調入庫別的權限");
     const dateStr = str(fd, "date") || todayTaipei();
     const date = movementTime(dateStr);
     const lines = json<Line[]>(fd, "lines").filter((l) => Number(l.qty) > 0);
     if (lines.length === 0) throw new UserError("請至少加入一個品項並填數量");
+    const toName = (await prisma.warehouse.findUnique({ where: { id: to } }))?.name;
+    detail = `${await linesText(from, lines)}｜調入 ${toName}`;
     await prisma.$transaction(async (tx) => {
       const t = await tx.transfer.create({
         data: {
@@ -49,5 +56,5 @@ export async function createTransfer(fd: FormData) {
     });
   });
   revalidatePath("/transfers");
-  return done(warnings.length ? `/transfers?warn=${encodeURIComponent(warnings.join("；"))}` : "/transfers", "已完成調撥");
+  return done(warnings.length ? `/transfers?warn=${encodeURIComponent(warnings.join("；"))}` : "/transfers", "已完成調撥", detail);
 }

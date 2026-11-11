@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { PageHeader, LinkButton, Empty, WarehousePills } from "@/components/ui";
-import { requireUser, pickWarehouse, getUnit } from "@/lib/auth";
+import { requireUser, pickWarehouse, getUnit, getAccess } from "@/lib/auth";
 import { activeWarehouses } from "@/lib/pickers";
 import { Flash } from "@/components/Flash";
 import { fmtDateTime, fmtMoney, fmtQty, num } from "@/lib/format";
@@ -9,7 +9,7 @@ export default async function ConsumptionPage({ searchParams }: { searchParams: 
   const sp = await searchParams;
   const [user, warehouses] = await Promise.all([requireUser(), activeWarehouses()]);
   const unit = await getUnit();
-  const wid = pickWarehouse(sp.warehouse, unit);
+  const wid = await pickWarehouse(sp.warehouse, unit);
   const moves = await prisma.stockMovement.findMany({
     where: { type: "CONSUME", ...(wid ? { warehouseId: wid } : {}) },
     include: { item: true, warehouse: true, batch: true, user: true },
@@ -18,9 +18,9 @@ export default async function ConsumptionPage({ searchParams }: { searchParams: 
   });
   return (
     <div>
-      <PageHeader title="耗用紀錄"><LinkButton href={wid ? `/consumption/new?warehouse=${wid}` : "/consumption/new"}>＋ 登記耗用</LinkButton></PageHeader>
+      <PageHeader title="耗用紀錄"><LinkButton href="/consumption/import" secondary>匯入 HIS 報表</LinkButton><LinkButton href={wid ? `/consumption/new?warehouse=${wid}` : "/consumption/new"}>＋ 登記耗用</LinkButton></PageHeader>
       <Flash sp={sp} />
-      <div className="mb-3"><WarehousePills path="/consumption" sp={sp} warehouses={warehouses} current={wid} mine={unit} /></div>
+      <div className="mb-3"><WarehousePills all={!(await getAccess()).limited} path="/consumption" sp={sp} warehouses={warehouses} current={wid} mine={unit} /></div>
       <div className="card overflow-x-auto p-0">
         {moves.length === 0 ? <Empty>還沒有耗用紀錄</Empty> : (
           <table className="table">

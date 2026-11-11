@@ -89,7 +89,8 @@ export function Pills({ items }: { items: { href: string; label: string; active:
 }
 
 /** Warehouse pills for list pages. "全部庫別" passes warehouse=all so the user's own warehouse isn't re-applied. */
-export function WarehousePills({ path, sp, warehouses, current, mine }: {
+export function WarehousePills({ path, sp, warehouses, current, mine, all = true }: {
+  all?: boolean; // false for people with hidden warehouses: no combined view
   path: string;
   sp: Record<string, string | undefined>;
   warehouses: { id: number; name: string }[];
@@ -98,7 +99,7 @@ export function WarehousePills({ path, sp, warehouses, current, mine }: {
 }) {
   return (
     <Pills items={[
-      { href: withParams(path, sp, { warehouse: "all" }), label: "全部庫別", active: current === undefined },
+      ...(all ? [{ href: withParams(path, sp, { warehouse: "all" }), label: "全部庫別", active: current === undefined }] : []),
       ...warehouses.map((w) => ({
         href: withParams(path, sp, { warehouse: String(w.id) }),
         label: w.id === mine ? `${w.name}（目前單位）` : w.name,
@@ -114,5 +115,25 @@ export function Field({ label, children, className }: { label: string; children:
       <span className="label">{label}</span>
       {children}
     </label>
+  );
+}
+
+/** 所屬部門 on 品項／供應商 forms: which department keeps this record. Blank = shared by the whole clinic. */
+export function OwnerSelect({ value, warehouses, locked }: { value: number | null | undefined; warehouses: { id: number; name: string }[]; locked?: string }) {
+  if (locked) {
+    return (
+      <Field label="所屬部門">
+        <input type="hidden" name="ownerWarehouseId" value={value ?? ""} />
+        <div className="py-1.5 text-sm text-slate-600">{locked}</div>
+      </Field>
+    );
+  }
+  return (
+    <Field label="所屬部門（由誰維護）">
+      <select name="ownerWarehouseId" className="input" defaultValue={value ?? ""}>
+        <option value="">全診所共用</option>
+        {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+      </select>
+    </Field>
   );
 }
