@@ -117,3 +117,23 @@ export function Field({ label, children, className }: { label: string; children:
     </label>
   );
 }
+
+/** 所屬部門 on 品項／供應商 forms: which department keeps this record. Blank = shared by the whole clinic. */
+export function OwnerSelect({ value, warehouses, locked }: { value: number | null | undefined; warehouses: { id: number; name: string }[]; locked?: string }) {
+  if (locked) {
+    return (
+      <Field label="所屬部門">
+        <input type="hidden" name="ownerWarehouseId" value={value ?? ""} />
+        <div className="py-1.5 text-sm text-slate-600">{locked}</div>
+      </Field>
+    );
+  }
+  return (
+    <Field label="所屬部門（由誰維護）">
+      <select name="ownerWarehouseId" className="input" defaultValue={value ?? ""}>
+        <option value="">全診所共用</option>
+        {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+      </select>
+    </Field>
+  );
+}

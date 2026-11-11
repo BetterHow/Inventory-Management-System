@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { PageHeader, Empty, Field } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { fmtDateTime, fmtQty, num } from "@/lib/format";
-import { activeWarehouses, pickItems, itemsByWarehouse } from "@/lib/pickers";
+import { activeWarehouses, pickItems, itemsByWarehouse, ownerVisible } from "@/lib/pickers";
 import { getAccess, getUnit } from "@/lib/auth";
 import { ItemPicker } from "@/components/ItemPicker";
 import { addEntry, addSuggestions, bulkAction, deleteEntry } from "./actions";
@@ -15,7 +15,7 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
   const [entries, items, suppliers, warehouses, ordered, picks, byWh] = await Promise.all([
     prisma.purchaseListEntry.findMany({ where: { status: "PENDING", ...(unit ? { warehouseId: unit } : {}) }, orderBy: { createdAt: "asc" } }),
     prisma.item.findMany({ where: { active: true }, orderBy: { code: "asc" } }),
-    prisma.supplier.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.supplier.findMany({ where: { active: true, ...(await ownerVisible()) }, orderBy: { name: "asc" } }),
     activeWarehouses(),
     prisma.receipt.findMany({ where: { status: "ORDERED", ...(unit ? { warehouseId: unit } : {}) }, include: { supplier: true }, orderBy: { date: "desc" } }),
     pickItems(),

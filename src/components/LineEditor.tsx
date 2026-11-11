@@ -1,4 +1,5 @@
 "use client";
+import { CameraScan } from "./CameraScan";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export type PickItem = {
@@ -86,13 +87,15 @@ export function LineEditor({
     [pool, query],
   );
 
-  function find(q: string): PickItem | undefined {
+  function exact(q: string): PickItem | undefined {
     const s = q.trim().toLowerCase();
     if (!s) return;
-    const exact = items.find(
-      (i) => i.barcode?.toLowerCase() === s || i.code.toLowerCase() === s || i.nhiCode?.toLowerCase() === s || label(i).toLowerCase() === s,
-    );
-    if (exact) return exact;
+    return items.find((i) => i.barcode?.toLowerCase() === s || i.code.toLowerCase() === s || i.nhiCode?.toLowerCase() === s || label(i).toLowerCase() === s);
+  }
+
+  function find(q: string): PickItem | undefined {
+    const hit = exact(q);
+    if (hit || !q.trim()) return hit;
     const partial = searchItems(items, q);
     return partial.length === 1 ? partial[0] : undefined;
   }
@@ -199,6 +202,14 @@ export function LineEditor({
           )}
         </div>
         <button type="button" className="btn-secondary" onClick={() => add(find(query) ?? (query.trim() || moved.current ? matches[hi] : undefined))}>加入</button>
+        <CameraScan
+          onCode={(code) => {
+            const it = exact(code);
+            if (!it) return { ok: false, text: `找不到條碼 ${code} 的品項。請先到「品項」把條碼填上。` };
+            add(it);
+            return { ok: true, text: `已加入 ${it.name}` };
+          }}
+        />
         {filtered && (hiddenCount > 0 || allItems) && (
           <label className="flex items-center gap-1 text-sm text-slate-600" title="預設只列這個單位用過的品項">
             <input type="checkbox" checked={allItems} onChange={(e) => setAllItems(e.target.checked)} /> 全部品項{!allItems && `（另有 ${hiddenCount} 項）`}

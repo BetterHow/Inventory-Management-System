@@ -5,7 +5,7 @@ import { getAccess } from "./auth";
 import type { PickItem, PickBatch } from "@/components/LineEditor";
 
 export async function pickItems(): Promise<PickItem[]> {
-  const items = await prisma.item.findMany({ where: { active: true }, orderBy: { code: "asc" } });
+  const items = await prisma.item.findMany({ where: { active: true, ...(await ownerVisible()) }, orderBy: { code: "asc" } });
   return items.map((i) => ({
     id: i.id,
     code: i.code,
@@ -70,4 +70,10 @@ export async function itemsByWarehouse(): Promise<Record<number, number[]>> {
   for (const r of [...batches, ...moves, ...settings, ...wanted]) add(r.warehouseId, r.itemId);
   for (const l of lines) add(l.receipt.warehouseId, l.itemId);
   return Object.fromEntries([...sets].map(([w, s]) => [w, [...s]]));
+}
+
+/** Prisma filter for 品項／供應商: leaves out records owned by a department hidden from this person. */
+export async function ownerVisible() {
+  const { hidden } = await getAccess();
+  return hidden.length ? { OR: [{ ownerWarehouseId: null }, { ownerWarehouseId: { notIn: hidden } }] } : {};
 }

@@ -4,7 +4,7 @@ import { assertRead } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { ReceiptForm } from "@/components/ReceiptForm";
-import { pickItems, writableWarehouses, itemsByWarehouse } from "@/lib/pickers";
+import { pickItems, writableWarehouses, itemsByWarehouse, ownerVisible } from "@/lib/pickers";
 import { getSettings } from "@/lib/settings";
 import { saveReceipt } from "../../actions";
 
@@ -17,7 +17,7 @@ export default async function EditReceiptPage({ params, searchParams }: {
   if (!receipt) notFound();
   await assertRead(receipt.warehouseId);
   const [suppliers, warehouses, items, settings] = await Promise.all([
-    prisma.supplier.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.supplier.findMany({ where: { active: true, ...(await ownerVisible()) }, orderBy: { name: "asc" } }),
     writableWarehouses(),
     pickItems(),
     getSettings(),

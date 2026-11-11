@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { assertWrite, requireUser } from "@/lib/auth";
+import { assertInvoiceWrite, assertWrite, requireUser } from "@/lib/auth";
 import { linesText } from "@/lib/audit";
 import { attempt, done } from "@/lib/action";
 import { UserError, intVal, json, optNum, optStr, str } from "@/lib/form";
@@ -163,7 +163,7 @@ export async function linkInvoice(id: number, fd: FormData) {
   await requireUser();
   await attempt(`/receipts/${id}`, async () => {
     const r = await prisma.receipt.findUniqueOrThrow({ where: { id } });
-    await assertWrite(r.warehouseId);
+    await assertInvoiceWrite([r.warehouseId]);
     const existingId = optNum(fd, "invoiceId");
     if (existingId) {
       await prisma.receipt.update({ where: { id }, data: { invoiceId: existingId } });
@@ -190,7 +190,7 @@ export async function unlinkInvoice(id: number) {
   await requireUser();
   await attempt(`/receipts/${id}`, async () => {
     const r = await prisma.receipt.findUniqueOrThrow({ where: { id } });
-    await assertWrite(r.warehouseId);
+    await assertInvoiceWrite([r.warehouseId]);
   });
   await prisma.receipt.update({ where: { id }, data: { invoiceId: null } });
   revalidatePath(`/receipts/${id}`);

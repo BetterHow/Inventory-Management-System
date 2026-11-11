@@ -2,11 +2,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { assertOwnerWrite, requireUser } from "@/lib/auth";
 import { attempt, done } from "@/lib/action";
 import { changes } from "@/lib/audit";
+import { writableWarehouses } from "@/lib/pickers";
 
-const ITEM_LABELS = { code: "料號", name: "品名", nhiCode: "健保碼", barcode: "條碼", spec: "規格", unit: "單位", categoryId: "類別", defaultSupplierId: "預設供應商", refPrice: "參考單價", salePrice: "健保價／售價", priceSource: "價格來源", trackBatch: "管批號", note: "備註", active: "啟用" };
+const ITEM_LABELS = { code: "料號", name: "品名", nhiCode: "健保碼", barcode: "條碼", spec: "規格", unit: "單位", categoryId: "類別", defaultSupplierId: "預設供應商", refPrice: "參考單價", salePrice: "健保價／售價", priceSource: "價格來源", trackBatch: "管批號", ownerWarehouseId: "所屬部門", note: "備註", active: "啟用" };
 import { UserError, bool, optInt, optNum, optStr, str } from "@/lib/form";
 import { setItemPrice } from "@/lib/prices";
 import { num } from "@/lib/format";
@@ -35,6 +36,7 @@ function readItem(fd: FormData) {
     refPrice: optNum(fd, "refPrice"),
     priceSource: str(fd, "priceSource") === "NHI" ? ("NHI" as const) : ("MANUAL" as const),
     trackBatch: bool(fd, "trackBatch"),
+    ownerWarehouseId: optInt(fd, "ownerWarehouseId"),
     note: optStr(fd, "note"),
     active: bool(fd, "active"),
   };
@@ -44,7 +46,9 @@ export async function createItem(fd: FormData) {
   await requireUser();
   await attempt("/items/new", async () => {
     await prisma.$transaction(async (tx) => {
-      const it = await tx.item.create({ data: readItem(fd) });
+      const data = readItem(fd);
+      await assertOwnerWrite(data.ownerWarehouseId);
+      const it = await tx.item.create({ data });
       await savePrice(tx, it.id, fd);
     });
   });
@@ -58,7 +62,9 @@ export async function updateItem(id: number, fd: FormData) {
   await attempt(`/items/${id}`, async () => {
     await prisma.$transaction(async (tx) => {
       const before = await tx.item.findUniqueOrThrow({ where: { id } });
-      await tx.item.update({ where: { id }, data: readItem(fd) });
+      const data = readItem(fd);
+      await assertOwnerWrite(before.ownerWarehouseId, data.ownerWarehouseId);
+      await tx.item.update({ where: { id }, data });
       await savePrice(tx, id, fd);
       const after = await tx.item.findUniqueOrThrow({ where: { id } });
       detail = `${after.code} ${after.name}　${changes(before, after, ITEM_LABELS) || "沒有變更"}`;
@@ -71,7 +77,8 @@ export async function updateItem(id: number, fd: FormData) {
 /** Manual monthly usage per warehouse (blank = automatic). */
 export async function saveItemSafety(itemId: number, fd: FormData) {
   await requireUser();
-  const warehouses = await prisma.warehouse.findMany();
+  // Only the departments this person can change: the others are not on their form and must keep their value.
+  const warehouses = await writableWarehouses();
   await attempt(`/items/${itemId}`, async () => {
     for (const w of warehouses) {
       const v = optNum(fd, `manual_${w.id}`);

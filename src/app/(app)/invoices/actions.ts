@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { assertInvoiceWrite, requireUser } from "@/lib/auth";
 import { attempt, done } from "@/lib/action";
 import { changes } from "@/lib/audit";
 import { UserError, bool, intVal, optNum, optStr, str } from "@/lib/form";
@@ -18,6 +18,7 @@ export async function createInvoice(fd: FormData) {
     if (!number) throw new UserError("請輸入發票號碼");
     const receiptIds = fd.getAll("receiptIds").map(Number).filter(Boolean);
     const receipts = await prisma.receipt.findMany({ where: { id: { in: receiptIds }, supplierId } });
+    await assertInvoiceWrite(receipts.map((r) => r.warehouseId));
     const amount = optNum(fd, "amount") ?? sum(receipts.map((r) => num(r.totalAmount)));
     const inv = await prisma.invoice.create({
       data: {
@@ -43,7 +44,8 @@ export async function updateInvoice(id: number, fd: FormData) {
     const number = str(fd, "number");
     if (!number) throw new UserError("請輸入發票號碼");
     const paid = bool(fd, "paid");
-    const before = await prisma.invoice.findUniqueOrThrow({ where: { id } });
+    const before = await prisma.invoice.findUniqueOrThrow({ where: { id }, include: { receipts: { select: { warehouseId: true } } } });
+    await assertInvoiceWrite(before.receipts.map((r) => r.warehouseId));
     const after = await prisma.invoice.update({
       where: { id },
       data: {
@@ -64,6 +66,10 @@ export async function updateInvoice(id: number, fd: FormData) {
 
 export async function deleteInvoice(id: number) {
   await requireUser();
+  await attempt(`/invoices/${id}`, async () => {
+    const linked = await prisma.receipt.findMany({ where: { invoiceId: id }, select: { warehouseId: true } });
+    await assertInvoiceWrite(linked.map((r) => r.warehouseId));
+  });
   await prisma.receipt.updateMany({ where: { invoiceId: id }, data: { invoiceId: null } });
   const inv = await prisma.invoice.delete({ where: { id } });
   revalidatePath("/invoices");

@@ -24,6 +24,8 @@ model User {
   // 負責庫別：列表與新單據預設只顯示／使用這個庫別（仍可切換到其他庫別）
   defaultWarehouseId Int?
   defaultWarehouse   Warehouse? @relation(fields: [defaultWarehouseId], references: [id])
+  // 行政：可查看與處理所有部門的發票，不受部門權限限制
+  invoiceClerk       Boolean    @default(false)
   createdAt          DateTime   @default(now())
 
   movements StockMovement[]
@@ -73,6 +75,9 @@ model Supplier {
   paymentTerms String?
   note         String?
   active       Boolean @default(true)
+  category     String? // 供應商分類（自由輸入，例：藥商、耗材、鏡片）
+  // 所屬部門：由該部門維護；空白 = 全診所共用
+  ownerWarehouseId Int?
 
   items    Item[]
   receipts Receipt[]
@@ -98,6 +103,7 @@ model Item {
   nhiPriceFrom      DateTime? @db.Date // 該健保價的生效日
   nhiCheckedAt      DateTime? // 最近一次匯入時有對到這個品項
   trackBatch        Boolean   @default(true) // 是否管批號效期
+  ownerWarehouseId  Int? // 所屬部門：由該部門維護；空白 = 全診所共用
   note              String?
   active            Boolean   @default(true)
   createdAt         DateTime  @default(now())

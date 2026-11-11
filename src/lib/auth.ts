@@ -40,6 +40,8 @@ export const getAccess = cache(async () => {
   const readOnly = new Set(rows.filter((r) => r.level === "READ").map((r) => r.warehouseId));
   const none = new Set(hidden);
   return {
+    // 行政 and admins handle invoices of every department.
+    clerk: user.role === "ADMIN" || user.invoiceClerk,
     limited: hidden.length > 0,
     hidden,
     canRead: (id: number) => !none.has(id),
@@ -55,6 +57,17 @@ export async function assertWrite(...warehouseIds: number[]) {
     const w = await prisma.warehouse.findUnique({ where: { id }, select: { name: true } });
     throw new UserError(`您沒有修改「${w?.name ?? "這個庫別"}」的權限，請洽管理員`);
   }
+}
+
+/** Records owned by a department (品項、供應商): blank owner = shared, anyone may change it. */
+export async function assertOwnerWrite(...owners: (number | null | undefined)[]) {
+  await assertWrite(...owners.filter((o): o is number => !!o));
+}
+
+/** Invoices follow the departments of their receipts; 行政 and admins may handle all of them. */
+export async function assertInvoiceWrite(warehouseIds: number[]) {
+  if ((await getAccess()).clerk) return;
+  await assertWrite(...new Set(warehouseIds));
 }
 
 /** For detail pages: a document of a hidden warehouse looks like it doesn't exist. */
@@ -88,4 +101,11 @@ export async function pickWarehouse(param: string | undefined, unit: number | un
   if (param && Number(param) > 0 && access.canRead(Number(param))) return Number(param);
   if (param === "all" && !access.limited) return undefined;
   return unit;
+}
+
+/** Prisma filter for invoices this person may see: all for 行政／admins, else not those wholly in hidden departments. */
+export async function invoiceVisible() {
+  const a = await getAccess();
+  if (a.clerk || !a.limited) return {};
+  return { OR: [{ receipts: { none: {} } }, { receipts: { some: { warehouseId: { notIn: a.hidden } } } }] };
 }

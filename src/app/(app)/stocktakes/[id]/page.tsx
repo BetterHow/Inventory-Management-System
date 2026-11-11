@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { assertRead } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { Flash } from "@/components/Flash";
+import { StocktakeScan } from "@/components/StocktakeScan";
 import { fmtQty, num } from "@/lib/format";
 import { deleteStocktake, saveCounts } from "../actions";
 
@@ -25,6 +26,7 @@ export default async function StocktakePage({ params, searchParams }: {
   return (
     <div className="space-y-4">
       <PageHeader title={`盤點 ${st.number} · ${wh?.name}`}>
+        {!done && <StocktakeScan />}
         {!done && <form action={deleteStocktake.bind(null, st.id)}><button className="btn-secondary text-rose-600">刪除</button></form>}
       </PageHeader>
       <Flash sp={sp} />
@@ -39,7 +41,7 @@ export default async function StocktakePage({ params, searchParams }: {
               const it = itemMap.get(l.itemId);
               const diff = l.countedQty === null ? null : num(l.countedQty) - num(l.systemQty);
               return (
-                <tr key={l.id}>
+                <tr key={l.id} data-name={it?.name} data-codes={[it?.barcode, it?.code, it?.nhiCode].filter(Boolean).join("|").toLowerCase()}>
                   <td>{it?.code}</td><td>{it?.name}</td>
                   <td className="num">{fmtQty(l.systemQty)} {it?.unit}</td>
                   <td className="num w-32">
