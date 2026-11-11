@@ -41,7 +41,8 @@ export function HisImport({ warehouses, defaultWarehouseId, today }: { warehouse
   const [to, setTo] = useState(today);
   const [paste, setPaste] = useState("");
   const [preview, setPreview] = useState<HisPreview | null>(null);
-  const [edits, setEdits] = useState<Record<number, { itemId?: number | null; factor?: number }>>({});
+  // Keyed by 藥品代號: picking an item or factor for one row applies to every row of the same code.
+  const [edits, setEdits] = useState<Record<string, { itemId?: number | null; factor?: number }>>({});
 
   function load(parsed: HisParse, name: string | null) {
     setError(null);
@@ -52,7 +53,7 @@ export function HisImport({ warehouses, defaultWarehouseId, today }: { warehouse
     start(async () => setPreview(await previewImport(parsed.rows, warehouseId, f, t)));
   }
 
-  const rows = useMemo(() => (preview?.rows ?? []).map((r) => ({ ...r, ...edits[r.key] })), [preview, edits]);
+  const rows = useMemo(() => (preview?.rows ?? []).map((r) => ({ ...r, ...edits[r.code] })), [preview, edits]);
   const itemById = useMemo(() => new Map((preview?.items ?? []).map((i) => [i.id, i])), [preview]);
   const unmatched = rows.filter((r) => !r.itemId);
   const byType = (["NHI", "SELF", "FREE"] as PriceType[]).map((t) => {
@@ -145,18 +146,18 @@ export function HisImport({ warehouses, defaultWarehouseId, today }: { warehouse
                       <td className="font-mono text-xs">{r.code}</td>
                       <td className="max-w-[14rem] truncate" title={r.name}>{r.name}</td>
                       <td>
-                        <select value={r.itemId ?? ""} onChange={(e) => setEdits({ ...edits, [r.key]: { ...edits[r.key], itemId: e.target.value ? Number(e.target.value) : null } })}
+                        <select value={r.itemId ?? ""} onChange={(e) => setEdits({ ...edits, [r.code]: { ...edits[r.code], itemId: e.target.value ? Number(e.target.value) : null } })}
                           className="input min-w-[12rem] py-1 text-sm">
                           <option value="">（不扣庫）</option>
                           {preview.items.map((i) => <option key={i.id} value={i.id}>{i.code} {i.name}</option>)}
                         </select>
-                        {r.matchedBy && r.matchedBy !== "map" && !edits[r.key]?.itemId && <div className="mt-0.5 text-[11px] text-slate-400">依{r.matchedBy === "nhi" ? "健保碼" : r.matchedBy === "code" ? "料號" : "條碼"}自動對應</div>}
+                        {r.matchedBy && r.matchedBy !== "map" && !edits[r.code]?.itemId && <div className="mt-0.5 text-[11px] text-slate-400">依{r.matchedBy === "nhi" ? "健保碼" : r.matchedBy === "code" ? "料號" : "條碼"}自動對應</div>}
                       </td>
                       <td className="num">{r.price.toLocaleString("zh-TW", { maximumFractionDigits: 2 })}</td>
-                      <td><span className={`badge ring-1 ring-inset ${TYPE_COLOR[r.priceType]}`} title={r.nhiPrice != null ? `健保價 ${r.nhiPrice}` : "沒有健保價資料"}>{PRICE_TYPE_LABEL[r.priceType]}</span></td>
+                      <td><span className={`badge ring-1 ring-inset ${TYPE_COLOR[r.priceType]}`} title={r.nhiPrice != null ? `健保價 ${r.nhiPrice}` : r.guessed ? "系統還沒有這個品項的健保價，用報表上的最低價推估為健保" : "沒有健保價資料"}>{PRICE_TYPE_LABEL[r.priceType]}{r.guessed && r.priceType !== "FREE" ? "（推估）" : ""}</span></td>
                       <td className="num">{qtyFmt(r.qty)}</td>
                       <td className="num">
-                        <input type="number" step="0.0001" min="0" value={r.factor} onChange={(e) => setEdits({ ...edits, [r.key]: { ...edits[r.key], factor: Number(e.target.value) || 1 } })}
+                        <input type="number" step="0.0001" min="0" value={r.factor} onChange={(e) => setEdits({ ...edits, [r.code]: { ...edits[r.code], factor: Number(e.target.value) || 1 } })}
                           className="input w-20 py-1 text-right text-sm" />
                       </td>
                       <td className="num whitespace-nowrap">{it ? `${qtyFmt(r.qty * r.factor)} ${it.unit}` : "—"}</td>
@@ -168,7 +169,7 @@ export function HisImport({ warehouses, defaultWarehouseId, today }: { warehouse
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-slate-500">價別自動歸類：0 元＝贈送；等於健保價＝健保；其他價格＝自費（含優惠）。只影響統計分布，獲利一律用報表的實際金額計算。換算：例如報表以「粒」計、庫存以「盒（100 粒）」計，就填 0.01。</p>
+          <p className="text-xs text-slate-500">價別自動歸類：0 元＝贈送；等於健保價＝健保；其他價格＝自費（含優惠）。系統還沒有健保價的品項，用報表上同品項的最低價當健保（標「推估」），到「健保價更新」匯入健保署檔案後就會變準。只影響統計分布，獲利一律用報表的實際金額計算。換算：例如報表以「粒」計、庫存以「盒（100 粒）」計，就填 0.01。</p>
           <div className="flex gap-2">
             <button type="button" onClick={apply} disabled={busy || rows.length === unmatched.length} className="btn">確認扣庫 {rows.length - unmatched.length} 列</button>
             <button type="button" onClick={() => setPreview(null)} className="btn-secondary">取消</button>
