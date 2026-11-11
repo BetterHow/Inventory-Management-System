@@ -94,6 +94,7 @@ model Item {
   settings     ItemWarehouseSetting[]
   receiptLines ReceiptLine[]
   prices       ItemPrice[]
+  hisCodes     HisCodeMap[]
 
   @@index([barcode])
   @@index([nhiCode])
@@ -154,7 +155,9 @@ model StockMovement {
   qty         Decimal      @db.Decimal(12, 2) // 正數=增加，負數=減少
   unitCost    Decimal      @default(0) @db.Decimal(14, 4)
   source      String       @default("MANUAL") // MANUAL / HIS / SCANNER
-  refType     String? // RECEIPT / CONSUMPTION / TRANSFER / STOCKTAKE
+  revenue     Decimal?     @db.Decimal(14, 2) // HIS 匯入的實收金額（依報表合計）；空白 = 用品項的健保價／售價推算
+  priceType   String? // HIS 匯入時自動歸類：NHI 健保 / SELF 自費 / FREE 贈送
+  refType     String? // RECEIPT / CONSUMPTION / TRANSFER / STOCKTAKE / HIS_IMPORT
   refId       Int?
   note        String?
   userId      Int?
@@ -314,4 +317,50 @@ model ItemPrice {
   createdAt     DateTime    @default(now())
 
   @@index([itemId, effectiveFrom])
+}
+
+// HIS（方鼎）每日耗用報表匯入：一次匯入 = 一份報表
+model HisImport {
+  id          Int       @id @default(autoincrement())
+  dateFrom    DateTime  @db.Date
+  dateTo      DateTime  @db.Date
+  warehouseId Int
+  fileName    String?
+  rowCount    Int       @default(0)
+  qty         Decimal   @default(0) @db.Decimal(14, 2)
+  revenue     Decimal   @default(0) @db.Decimal(14, 2)
+  cost        Decimal   @default(0) @db.Decimal(14, 2)
+  createdById Int?
+  createdAt   DateTime  @default(now())
+
+  lines HisImportLine[]
+
+  @@index([dateTo])
+}
+
+model HisImportLine {
+  id        Int       @id @default(autoincrement())
+  importId  Int
+  import    HisImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  hisCode   String
+  hisName   String
+  itemId    Int?
+  unitPrice Decimal   @db.Decimal(14, 2)
+  hisQty    Decimal   @db.Decimal(12, 2) // 報表上的用量（HIS 單位）
+  qty       Decimal   @db.Decimal(12, 2) // 換算成庫存單位後扣的數量
+  amount    Decimal   @db.Decimal(14, 2) // 報表合計＝收入
+  hisCost   Decimal?  @db.Decimal(14, 2) // 報表上的成本（參考）
+  rxCount   Int?      // 開藥次
+  priceType String    // NHI / SELF / FREE
+  cost      Decimal   @default(0) @db.Decimal(14, 2) // 依批次進價算出的成本
+
+  @@index([itemId])
+}
+
+// HIS 藥品代號 → 系統品項。健保碼相同時自動對到，其餘第一次匯入時指定一次就記住
+model HisCodeMap {
+  hisCode String @id
+  itemId  Int
+  item    Item    @relation(fields: [itemId], references: [id])
+  factor  Decimal @default(1) @db.Decimal(12, 4) // HIS 1 單位 = 庫存幾單位
 }
