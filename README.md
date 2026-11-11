@@ -72,3 +72,8 @@ npm run dev                   # http://localhost:3000
 | `APP_URL`（選填） | 信裡「打開庫存系統」的網址 |
 
 加完後重新部署一次。排程寫在 `vercel.json`（UTC 00:00，也就是台灣早上 8 點；Vercel 免費方案的排程可能晚幾十分鐘執行）。沒設定 `RESEND_API_KEY` 時系統不會寄信，其他功能不受影響。
+
+## 忘記密碼
+
+- 一般人員忘記：請管理員到「使用者」頁，在那個人的列填新密碼後儲存。
+- 管理員忘記：如果還有另一位管理員，請對方用同樣方式重設。只有一位管理員時，到 Vercel 專案的 Settings → Environment Variables 新增 `RESET_ADMIN_PASSWORD`（8 個字以上的新密碼），到 Deployments 按 Redeploy，之後用帳號 `admin` 和這組新密碼登入。登入後請把這個變數刪掉，並到「我的帳號」改成自己的密碼。

@@ -14,6 +14,13 @@ async function main() {
       data: { username: "admin", name: "管理員", role: "ADMIN", passwordHash: await bcrypt.hash(password, 10) },
     });
   }
+  // Forgot the admin password: set RESET_ADMIN_PASSWORD in the hosting settings and redeploy, log in, then remove it.
+  const reset = process.env.RESET_ADMIN_PASSWORD;
+  if (reset) {
+    if (reset.length < 8) throw new Error("RESET_ADMIN_PASSWORD needs 8+ characters");
+    await prisma.user.update({ where: { username: "admin" }, data: { passwordHash: await bcrypt.hash(reset, 10), active: true, role: "ADMIN" } });
+    console.log("Admin password was reset from RESET_ADMIN_PASSWORD. Remove that variable now.");
+  }
   const warehouses = [
     { code: "PH", name: "藥局", sortOrder: 1 },
     { code: "NS", name: "護理部", sortOrder: 2 },

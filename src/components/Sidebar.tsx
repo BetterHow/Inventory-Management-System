@@ -68,6 +68,17 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const [switching, startSwitch] = useTransition();
+  // 早安 05–11、午安 11–18、晚安 18–05, by the clock in Taiwan. Set after loading so the server and browser agree.
+  const [greeting, setGreeting] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Taipei", hour: "2-digit", hour12: false }).format(new Date())) % 24;
+      setGreeting(h >= 5 && h < 11 ? "早安" : h >= 11 && h < 18 ? "午安" : "晚安");
+    };
+    tick();
+    const t = setInterval(tick, 5 * 60000);
+    return () => clearInterval(t);
+  }, []);
   const unitName = unit ? units.find((u) => u.id === unit)?.name : "全部單位";
   function switchUnit(v: string) {
     window.dispatchEvent(new Event(NAV_START_EVENT));
@@ -159,7 +170,10 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
             {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
           </button>
         </div>
-        <div className={`px-4 pb-4 pt-3 md:pt-0 ${collapsed ? "md:hidden" : ""}`}>
+        <div className={`px-4 pb-3 pt-3 text-sm text-slate-600 md:pt-0 ${collapsed ? "md:hidden" : ""}`}>
+          {greeting ? <>{greeting}，<span className="font-semibold text-slate-900">{userName}</span></> : "\u00a0"}
+        </div>
+        <div className={`px-4 pb-4 ${collapsed ? "md:hidden" : ""}`}>
           <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-500"><Building2 className="size-3.5" />目前單位</div>
           {unitSelect}
         </div>
