@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Prisma, ReceiptStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireUser, pickWarehouse, getUnit } from "@/lib/auth";
+import { requireUser, pickWarehouse, getUnit, getAccess } from "@/lib/auth";
 import { activeWarehouses } from "@/lib/pickers";
 import { PageHeader, LinkButton, Empty, Pills, WarehousePills, withParams, Field } from "@/components/ui";
 import { Flash } from "@/components/Flash";
@@ -19,7 +19,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
     prisma.category.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
   ]);
   const unit = await getUnit();
-  const wid = pickWarehouse(sp.warehouse, unit);
+  const wid = await pickWarehouse(sp.warehouse, unit);
   const status = sp.status as ReceiptStatus | undefined;
   const q = sp.q?.trim();
 
@@ -63,7 +63,7 @@ export default async function ReceiptsPage({ searchParams }: { searchParams: Pro
       <PageHeader title="進貨單"><LinkButton href={wid ? `/receipts/new?warehouse=${wid}` : "/receipts/new"}>＋ 新增進貨單</LinkButton></PageHeader>
       <Flash sp={sp} />
       <div className="mb-3 space-y-2">
-        <WarehousePills path="/receipts" sp={sp} warehouses={warehouses} current={wid} mine={unit} />
+        <WarehousePills all={!(await getAccess()).limited} path="/receipts" sp={sp} warehouses={warehouses} current={wid} mine={unit} />
         <Pills items={statusTabs.map(([v, l]) => ({ href: withParams("/receipts", sp, { status: v }), label: l, active: (status ?? "") === v }))} />
       </div>
 

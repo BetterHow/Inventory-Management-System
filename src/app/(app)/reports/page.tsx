@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getUnit } from "@/lib/auth";
+import { getAccess, getUnit, pickWarehouse } from "@/lib/auth";
 import { AutoForm } from "@/components/AutoForm";
 import { prisma } from "@/lib/db";
 import { PageHeader, Field, Empty } from "@/components/ui";
@@ -16,7 +16,8 @@ const TABS: [string, string][] = [
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
   const unit = await getUnit();
-  const p = defaultParams({ ...sp, warehouse: sp.warehouse ?? (unit ? String(unit) : "all") });
+  const wid = await pickWarehouse(sp.warehouse, unit);
+  const p = defaultParams({ ...sp, warehouse: wid ? String(wid) : "all" });
   const [report, warehouses, categories] = await Promise.all([
     buildReport(p),
     activeWarehouses(),
@@ -40,7 +41,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <input type="hidden" name="tab" value={p.tab} />
         <Field label="庫別">
           <select name="warehouse" defaultValue={p.warehouse} className="input">
-            <option value="all">全部</option>
+            {!(await getAccess()).limited && <option value="all">全部</option>}
             {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
         </Field>

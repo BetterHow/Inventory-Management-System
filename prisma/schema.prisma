@@ -27,6 +27,18 @@ model User {
   createdAt          DateTime   @default(now())
 
   movements StockMovement[]
+  access    UserWarehouseAccess[]
+}
+
+// 部門權限：只記「限制」。沒有紀錄 = 可看可改，所以預設全部開放
+model UserWarehouseAccess {
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  warehouseId Int
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  level       String // READ = 只能看；NONE = 不開放
+
+  @@id([userId, warehouseId])
 }
 
 // 庫別：依部門分開管理庫存（藥局、護理部、眼鏡部⋯）
@@ -42,6 +54,7 @@ model Warehouse {
   movements StockMovement[]
   settings  ItemWarehouseSetting[]
   users     User[]
+  access    UserWarehouseAccess[]
 }
 
 model Category {

@@ -5,7 +5,7 @@ import { AutoForm } from "@/components/AutoForm";
 import { LineChart, BarChart, RankBars, ShareBar } from "@/components/Charts";
 import { analytics, resolvePeriod, PERIODS } from "@/lib/analytics";
 import { ItemsTab, StockTab } from "./tabs";
-import { getUnit, pickWarehouse } from "@/lib/auth";
+import { getUnit, pickWarehouse, getAccess } from "@/lib/auth";
 import { activeWarehouses } from "@/lib/pickers";
 import { fmtMoney, fmtQty } from "@/lib/format";
 
@@ -42,7 +42,7 @@ function Kpi({ label, value, prev, icon: Icon, hint, goodWhenUp = true }: {
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
   const [unit, warehouses] = await Promise.all([getUnit(), activeWarehouses()]);
-  const wid = pickWarehouse(sp.warehouse, unit);
+  const wid = await pickWarehouse(sp.warehouse, unit);
   const { cur, prev } = resolvePeriod(sp);
   const tab = sp.tab === "items" || sp.tab === "stock" ? sp.tab : "overview";
   const whName = wid ? warehouses.find((w) => w.id === wid)?.name : "全部單位";
@@ -56,7 +56,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   );
   const filters = (
     <div className="space-y-2">
-      <WarehousePills path="/analytics" sp={sp} warehouses={warehouses} current={wid} mine={unit} />
+      <WarehousePills all={!(await getAccess()).limited} path="/analytics" sp={sp} warehouses={warehouses} current={wid} mine={unit} />
       {tab !== "stock" && (
         <div className="flex flex-wrap items-end gap-3">
           <Pills items={PERIODS.map(([k, l]) => ({ href: withParams("/analytics", { warehouse: sp.warehouse, loss: sp.loss, tab: sp.tab }, { period: k }), label: l, active: cur.key === k }))} />

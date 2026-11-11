@@ -4,7 +4,7 @@ import { PageHeader, Empty } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { HisImport } from "@/components/HisImport";
 import { activeWarehouses } from "@/lib/pickers";
-import { getUnit } from "@/lib/auth";
+import { getAccess, getUnit } from "@/lib/auth";
 import { todayTaipei } from "@/lib/logic";
 import { fmtDateTime, fmtMoney, num } from "@/lib/format";
 import { undoImport } from "./actions";
@@ -14,8 +14,9 @@ export default async function HisImportPage({ searchParams }: { searchParams: Pr
   const [warehouses, unit, recent] = await Promise.all([
     activeWarehouses(),
     getUnit(),
-    prisma.hisImport.findMany({ orderBy: { createdAt: "desc" }, take: 30 }),
+    prisma.hisImport.findMany({ where: { warehouseId: { notIn: (await getAccess()).hidden } }, orderBy: { createdAt: "desc" }, take: 30 }),
   ]);
+  const access = await getAccess();
   const whName = new Map(warehouses.map((w) => [w.id, w.name]));
   return (
     <div className="space-y-6">
@@ -24,7 +25,7 @@ export default async function HisImportPage({ searchParams }: { searchParams: Pr
         <Link href="/consumption" className="btn-secondary">回耗用紀錄</Link>
       </PageHeader>
       <Flash sp={sp} />
-      <HisImport warehouses={warehouses} defaultWarehouseId={unit} today={todayTaipei()} />
+      <HisImport warehouses={warehouses.filter((w) => access.canWrite(w.id))} defaultWarehouseId={unit} today={todayTaipei()} />
       <section className="card p-0">
         <h2 className="px-5 pb-3 pt-5 font-semibold text-slate-900">最近匯入</h2>
         {recent.length === 0 ? <Empty>還沒有匯入紀錄</Empty> : (

@@ -53,7 +53,8 @@ export const NAV: NavGroup[] = [
   },
 ];
 
-export default function Sidebar({ userName, isAdmin, clinicName, logout, initialCollapsed = false, unit, units }: {
+export default function Sidebar({ userName, isAdmin, clinicName, logout, initialCollapsed = false, unit, units, allowAll = true }: {
+  allowAll?: boolean;
   unit: number | null;
   units: { id: number; name: string }[];
   initialCollapsed?: boolean;
@@ -91,7 +92,7 @@ export default function Sidebar({ userName, isAdmin, clinicName, logout, initial
       className="select-plain w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-3 text-sm font-medium text-slate-800 hover:border-slate-300 focus:border-teal-500 focus:outline-none focus:ring-3 focus:ring-teal-500/15"
     >
       {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-      <option value="all">全部單位</option>
+      {allowAll && <option value="all">全部單位</option>}
     </select>
   );
   // Desktop only: fold the sidebar into a narrow strip. Remembered in a cookie so it stays folded.

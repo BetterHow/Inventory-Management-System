@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { assertWrite, requireUser } from "@/lib/auth";
 import { attempt, done } from "@/lib/action";
 import { UserError, intVal, json, optStr, str } from "@/lib/form";
 import { removeStock } from "@/lib/stock";
@@ -14,6 +14,7 @@ export async function createConsumption(fd: FormData) {
   const warnings: string[] = [];
   await attempt("/consumption/new", async () => {
     const warehouseId = intVal(fd, "warehouseId");
+    await assertWrite(warehouseId);
     const dateStr = str(fd, "date");
     if (!dateStr) throw new UserError("請選擇日期");
     // Use noon Taiwan time unless it's today, so the record lands on the chosen day.

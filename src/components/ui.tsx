@@ -89,7 +89,8 @@ export function Pills({ items }: { items: { href: string; label: string; active:
 }
 
 /** Warehouse pills for list pages. "全部庫別" passes warehouse=all so the user's own warehouse isn't re-applied. */
-export function WarehousePills({ path, sp, warehouses, current, mine }: {
+export function WarehousePills({ path, sp, warehouses, current, mine, all = true }: {
+  all?: boolean; // false for people with hidden warehouses: no combined view
   path: string;
   sp: Record<string, string | undefined>;
   warehouses: { id: number; name: string }[];
@@ -98,7 +99,7 @@ export function WarehousePills({ path, sp, warehouses, current, mine }: {
 }) {
   return (
     <Pills items={[
-      { href: withParams(path, sp, { warehouse: "all" }), label: "全部庫別", active: current === undefined },
+      ...(all ? [{ href: withParams(path, sp, { warehouse: "all" }), label: "全部庫別", active: current === undefined }] : []),
       ...warehouses.map((w) => ({
         href: withParams(path, sp, { warehouse: String(w.id) }),
         label: w.id === mine ? `${w.name}（目前單位）` : w.name,
