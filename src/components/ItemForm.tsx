@@ -28,6 +28,9 @@ export function ItemForm({ item, categories, suppliers, action, cancelHref = "/i
       <Field label="單位"><input name="unit" className="input" defaultValue={item?.unit ?? "個"} /></Field>
       <Field label="健保碼"><input name="nhiCode" className="input" defaultValue={item?.nhiCode ?? ""} /></Field>
       <Field label="國際條碼（掃描槍或相機）"><BarcodeField defaultValue={item?.barcode ?? ""} /></Field>
+      <Field label="搜尋關鍵字（可填多個，用空白或逗號分開）" className="sm:col-span-2">
+        <input name="keywords" className="input" defaultValue={item?.keywords ?? ""} placeholder="例如 BET BETA NEO（成分名、俗名、商品名，跟方鼎的藥品索引一樣）" />
+      </Field>
       <Field label="規格"><input name="spec" className="input" defaultValue={item?.spec ?? ""} /></Field>
       <Field label="參考單價（含稅）">
         <input name="refPrice" type="number" step="0.01" className="input" defaultValue={item?.refPrice ? num(item.refPrice) : ""} />

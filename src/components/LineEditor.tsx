@@ -9,6 +9,7 @@ export type PickItem = {
   unit: string;
   barcode: string | null;
   nhiCode: string | null;
+  keywords: string; // 搜尋關鍵字，空白分隔
   refPrice: number;
   trackBatch: boolean;
 };
@@ -173,7 +174,7 @@ export function LineEditor({
                 add(find(query) ?? (showing && (query.trim() || moved.current) ? matches[hi] : undefined));
               }
             }}
-            placeholder="掃條碼，或輸入料號／品名／健保碼"
+            placeholder="掃條碼，或輸入料號／品名／健保碼／關鍵字"
             className="input"
           />
           {open && (query.trim() !== "" || matches.length > 0) && (
@@ -341,12 +342,14 @@ export function searchItems(items: PickItem[], q: string, limit = 12): PickItem[
   for (const it of items) {
     const code = it.code.toLowerCase();
     const name = it.name.toLowerCase();
-    const extra = [it.barcode, it.nhiCode].filter(Boolean).join(" ").toLowerCase();
+    const extra = [it.barcode, it.nhiCode, it.keywords].filter(Boolean).join(" ").toLowerCase();
+    const keys = it.keywords ? it.keywords.toLowerCase().split(" ") : [];
     const hay = `${code} ${name} ${extra}`;
     if (!words.every((w) => hay.includes(w))) continue;
     let score = 5;
     if (code === first || it.barcode?.toLowerCase() === first || it.nhiCode?.toLowerCase() === first) score = 0;
-    else if (code.startsWith(first)) score = 1;
+    else if (keys.includes(first) || code.startsWith(first)) score = 1;
+    else if (keys.some((k) => k.startsWith(first))) score = 2;
     else if (name.startsWith(first)) score = 2;
     else if (name.includes(first)) score = 3;
     else if (code.includes(first)) score = 4;

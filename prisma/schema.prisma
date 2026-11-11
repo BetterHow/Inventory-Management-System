@@ -90,6 +90,7 @@ model Item {
   name              String
   nhiCode           String? // 健保碼
   barcode           String? // 國際條碼
+  keywords          String    @default("") // 搜尋關鍵字（空白分隔），像方鼎的藥品索引：成分名、俗名、商品名
   spec              String?
   unit              String    @default("個")
   categoryId        Int?

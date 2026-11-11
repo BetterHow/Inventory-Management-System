@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
+import { getAccess } from "./auth";
 import { num } from "./format";
 import { movementTime, round2 } from "./logic";
 import { removeStock } from "./stock";
@@ -27,8 +28,9 @@ function nhiOf(i: PriceInfo): number | null {
 
 /** Matches each report row to an item: remembered mapping, then 健保碼, 料號, 條碼. Nothing is saved. */
 export async function previewHis(rows: HisRow[], warehouseId: number, from: string, to: string) {
+  const canSee = (await getAccess()).canRead;
   const [items, maps, overlap] = await Promise.all([
-    prisma.item.findMany({ where: { active: true }, select: { id: true, code: true, name: true, unit: true, nhiCode: true, barcode: true, nhiPrice: true, salePrice: true, priceSource: true } }),
+    prisma.item.findMany({ where: { active: true }, select: { id: true, code: true, name: true, unit: true, nhiCode: true, barcode: true, keywords: true, ownerWarehouseId: true, nhiPrice: true, salePrice: true, priceSource: true } }),
     prisma.hisCodeMap.findMany(),
     prisma.hisImport.findMany({
       where: { warehouseId, dateFrom: { lte: new Date(to + "T00:00:00Z") }, dateTo: { gte: new Date(from + "T00:00:00Z") } },
@@ -58,7 +60,11 @@ export async function previewHis(rows: HisRow[], warehouseId: number, from: stri
   }).map(({ item: _item, ...r }) => r);
   return {
     rows: out,
-    items: items.map((i) => ({ id: i.id, code: i.code, name: i.name, unit: i.unit, nhiCode: i.nhiCode })).sort((a, b) => a.code.localeCompare(b.code)),
+    // The item list to pick from leaves out other departments' own items; automatic matching above still sees every item.
+    items: items
+      .filter((i) => i.ownerWarehouseId == null || canSee(i.ownerWarehouseId))
+      .map((i) => ({ id: i.id, code: i.code, name: i.name, unit: i.unit, nhiCode: i.nhiCode, keywords: i.keywords }))
+      .sort((a, b) => a.code.localeCompare(b.code)),
     overlap: overlap.map((o) => ({ id: o.id, from: o.dateFrom.toISOString().slice(0, 10), to: o.dateTo.toISOString().slice(0, 10), at: o.createdAt, rows: o.rowCount })),
   };
 }
