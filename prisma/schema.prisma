@@ -377,3 +377,18 @@ model HisCodeMap {
   item    Item    @relation(fields: [itemId], references: [id])
   factor  Decimal @default(1) @db.Decimal(12, 4) // HIS 1 單位 = 庫存幾單位
 }
+
+// 操作紀錄：誰在什麼時候做了什麼。只新增，不修改
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  at        DateTime @default(now())
+  userId    Int?
+  userName  String   @default("")
+  area      String // 功能：進貨單、品項、使用者⋯
+  action    String // 做了什麼（畫面上顯示的那句話）
+  detail    String? // 對象與變更內容
+  path      String? // 相關頁面
+
+  @@index([at])
+  @@index([userId, at])
+}

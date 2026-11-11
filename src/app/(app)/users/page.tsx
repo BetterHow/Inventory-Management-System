@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { attempt, done } from "@/lib/action";
+import { changes } from "@/lib/audit";
 import { UserError, bool, str } from "@/lib/form";
 import { PageHeader } from "@/components/ui";
 import { Flash } from "@/components/Flash";
@@ -25,19 +26,21 @@ async function addUser(fd: FormData) {
     });
   });
   revalidatePath("/users");
-  return done("/users", "已新增使用者");
+  return done("/users", "已新增使用者", `${str(fd, "username")}（${str(fd, "name")}）`);
 }
 
 async function saveUser(id: number, fd: FormData) {
   "use server";
   const me = await requireAdmin();
+  let detail = "";
   await attempt("/users", async () => {
     const role = str(fd, "role") === "ADMIN" ? "ADMIN" : "STAFF";
     const active = bool(fd, "active");
     if (id === me.id && (role !== "ADMIN" || !active)) throw new UserError("不能停用自己或取消自己的管理員身分");
     const password = str(fd, "password");
     if (password && password.length < 8) throw new UserError("密碼至少 8 個字元");
-    await prisma.user.update({
+    const before = await prisma.user.findUniqueOrThrow({ where: { id }, include: { access: true } });
+    const after = await prisma.user.update({
       where: { id },
       data: {
         name: str(fd, "name"),
@@ -54,9 +57,16 @@ async function saveUser(id: number, fd: FormData) {
       prisma.userWarehouseAccess.deleteMany({ where: { userId: id } }),
       prisma.userWarehouseAccess.createMany({ data: role === "ADMIN" ? [] : limits }),
     ]);
+    const acc = (list: { warehouseId: number; level: string }[]) => list.map((a) => `${a.warehouseId}:${a.level}`).sort().join(",");
+    detail = [
+      after.username,
+      changes(before, after, { name: "姓名", role: "角色", defaultWarehouseId: "負責庫別", active: "啟用" }),
+      password ? "重設密碼" : "",
+      acc(before.access) !== acc(role === "ADMIN" ? [] : limits) ? "調整部門權限" : "",
+    ].filter(Boolean).join("　");
   });
   revalidatePath("/", "layout");
-  return done("/users", "已儲存");
+  return done("/users", "已修改使用者", detail);
 }
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {

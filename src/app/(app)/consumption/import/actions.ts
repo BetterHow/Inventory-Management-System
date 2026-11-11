@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { applyHis, previewHis, undoHis, type ApplyRow } from "@/lib/his";
 import type { HisRow } from "@/lib/hisParse";
 import { attempt, done } from "@/lib/action";
+import { audit } from "@/lib/audit";
 
 export type HisPreview = Awaited<ReturnType<typeof previewHis>>;
 
@@ -20,6 +21,7 @@ export async function applyImport(a: { rows: ApplyRow[]; warehouseId: number; fr
   if (!a.from || !a.to) return { error: "請填報表日期" };
   if (a.from > a.to) return { error: "開始日期晚於結束日期" };
   const r = await applyHis({ ...a, userId: user.id });
+  await audit("/consumption/import", "已匯入 HIS 耗用", `${a.from === a.to ? a.to : `${a.from}～${a.to}`}｜${r.count} 列${a.fileName ? `｜${a.fileName}` : ""}`);
   revalidatePath("/");
   revalidatePath("/consumption");
   revalidatePath("/consumption/import");
@@ -34,5 +36,5 @@ export async function undoImport(fd: FormData) {
   await attempt("/consumption/import", () => assertWrite(imp.warehouseId));
   await undoHis(id);
   revalidatePath("/");
-  return done("/consumption/import", "已撤銷這次匯入，庫存已加回");
+  return done("/consumption/import", "已撤銷這次匯入，庫存已加回", `匯入 #${id}`);
 }

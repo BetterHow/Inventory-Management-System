@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { attempt } from "@/lib/action";
+import { audit } from "@/lib/audit";
 import { UserError, intVal, str } from "@/lib/form";
 import { PageHeader } from "@/components/ui";
 import { Flash } from "@/components/Flash";
@@ -14,6 +15,7 @@ async function addCategory(fd: FormData) {
     const name = str(fd, "name");
     if (!name) throw new UserError("請輸入類別名稱");
     await prisma.category.create({ data: { name, sortOrder: intVal(fd, "sortOrder") } });
+    await audit("/categories", "已新增類別", name);
   });
   revalidatePath("/categories");
 }
@@ -24,7 +26,9 @@ async function renameCategory(id: number, fd: FormData) {
   await attempt("/categories", async () => {
     const name = str(fd, "name");
     if (!name) throw new UserError("請輸入類別名稱");
+    const before = await prisma.category.findUniqueOrThrow({ where: { id } });
     await prisma.category.update({ where: { id }, data: { name, sortOrder: intVal(fd, "sortOrder") } });
+    await audit("/categories", "已修改類別", before.name === name ? name : `${before.name} → ${name}`);
   });
   revalidatePath("/categories");
 }
@@ -34,7 +38,8 @@ async function deleteCategory(id: number) {
   await requireUser();
   const used = await prisma.item.count({ where: { categoryId: id } });
   if (used > 0) redirect("/categories?error=" + encodeURIComponent(`還有 ${used} 個品項用這個類別，請先改掉`));
-  await prisma.category.delete({ where: { id } });
+  const gone = await prisma.category.delete({ where: { id } });
+  await audit("/categories", "已刪除類別", gone.name);
   revalidatePath("/categories");
 }
 

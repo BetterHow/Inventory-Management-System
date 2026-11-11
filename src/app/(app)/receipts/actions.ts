@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { assertWrite, requireUser } from "@/lib/auth";
+import { linesText } from "@/lib/audit";
 import { attempt, done } from "@/lib/action";
 import { UserError, intVal, json, optNum, optStr, str } from "@/lib/form";
 import { addStock, nextNumber } from "@/lib/stock";
 import { getSettings } from "@/lib/settings";
-import { dateOnly, num } from "@/lib/format";
+import { dateOnly, num, RECEIPT_STATUS_LABEL } from "@/lib/format";
 import { movementTime, round2, sum, todayTaipei } from "@/lib/logic";
 import type { Line } from "@/components/LineEditor";
 
@@ -124,7 +125,9 @@ export async function saveReceipt(id: number | null, fd: FormData) {
   });
   revalidatePath("/receipts");
   revalidatePath("/");
-  return done(`/receipts/${savedId}`, "已儲存");
+  const saved = await prisma.receipt.findUnique({ where: { id: savedId }, include: { lines: true, supplier: true } });
+  return done(`/receipts/${savedId}`, id ? "已修改進貨單" : "已新增進貨單",
+    saved && `${saved.number}｜${saved.supplier.name}｜${RECEIPT_STATUS_LABEL[saved.status] ?? saved.status}｜金額 ${saved.totalAmount}｜${await linesText(saved.warehouseId, saved.lines)}`);
 }
 
 export async function inspectReceipt(id: number) {
@@ -139,7 +142,7 @@ export async function inspectReceipt(id: number) {
     });
   });
   revalidatePath("/receipts");
-  return done(`/receipts/${id}`, "已驗收入庫");
+  return done(`/receipts/${id}`, "已驗收入庫", await receiptNo(id));
 }
 
 export async function cancelReceipt(id: number) {
@@ -152,7 +155,7 @@ export async function cancelReceipt(id: number) {
     await prisma.purchaseListEntry.deleteMany({ where: { receiptId: id } });
   });
   revalidatePath("/receipts");
-  return done(`/receipts/${id}`, "已取消");
+  return done(`/receipts/${id}`, "已取消進貨單", await receiptNo(id));
 }
 
 /** Attach this receipt to an existing invoice, or create a new one. */
@@ -180,7 +183,7 @@ export async function linkInvoice(id: number, fd: FormData) {
     await prisma.receipt.update({ where: { id }, data: { invoiceId: inv.id } });
   });
   revalidatePath(`/receipts/${id}`);
-  return done(`/receipts/${id}`, "已設定發票");
+  return done(`/receipts/${id}`, "已設定發票", `${await receiptNo(id)}｜發票 ${str(fd, "invoiceNumber") || "（既有發票）"}`);
 }
 
 export async function unlinkInvoice(id: number) {
@@ -191,4 +194,8 @@ export async function unlinkInvoice(id: number) {
   });
   await prisma.receipt.update({ where: { id }, data: { invoiceId: null } });
   revalidatePath(`/receipts/${id}`);
+}
+
+async function receiptNo(id: number) {
+  return (await prisma.receipt.findUnique({ where: { id }, select: { number: true } }))?.number ?? `#${id}`;
 }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { assertWrite, requireUser } from "@/lib/auth";
+import { linesText } from "@/lib/audit";
 import { attempt, done } from "@/lib/action";
 import { UserError, intVal, numVal, optInt, optStr, str, withParam } from "@/lib/form";
 import { nextNumber } from "@/lib/stock";
@@ -33,7 +34,7 @@ export async function addEntry(fd: FormData) {
     });
   });
   revalidatePath("/purchase-list");
-  return done(back, "已加入待採購清單");
+  return done(back, "已加入待採購清單", `${str(fd, "item").split("｜")[0]} ×${str(fd, "qty")}`, "/purchase-list");
 }
 
 export async function bulkAction(fd: FormData) {
@@ -41,10 +42,12 @@ export async function bulkAction(fd: FormData) {
   const ids = fd.getAll("ids").map(Number).filter(Boolean);
   const action = str(fd, "action");
   let msg = "";
+  let detail = "";
   await attempt("/purchase-list", async () => {
     if (ids.length === 0) throw new UserError("請先勾選項目");
     const entries = await prisma.purchaseListEntry.findMany({ where: { id: { in: ids }, status: "PENDING" } });
     await assertWrite(...new Set(entries.map((e) => e.warehouseId)));
+    detail = await linesText(null, entries);
     if (action === "clear") {
       await prisma.purchaseListEntry.deleteMany({ where: { id: { in: entries.map((e) => e.id) } } });
       msg = `已刪除 ${entries.length} 項`;
@@ -84,18 +87,22 @@ export async function bulkAction(fd: FormData) {
     msg = `已轉成 ${groups.size} 張待入庫進貨單`;
   });
   revalidatePath("/purchase-list");
-  return done("/purchase-list", msg);
+  return done("/purchase-list", msg, detail);
 }
 
 export async function deleteEntry(id: number) {
   await requireUser();
+  let detail = "";
   await attempt("/purchase-list", async () => {
     const e = await prisma.purchaseListEntry.findUnique({ where: { id } });
-    if (e) await assertWrite(e.warehouseId);
+    if (e) {
+      await assertWrite(e.warehouseId);
+      detail = await linesText(e.warehouseId, [e]);
+    }
   });
   await prisma.purchaseListEntry.deleteMany({ where: { id, status: "PENDING" } });
   revalidatePath("/purchase-list");
-  return done("/purchase-list", "已刪除");
+  return done("/purchase-list", "已從待採購清單刪除", detail);
 }
 
 /** Adds the ticked 補貨建議 to the list with the quantities shown (editable). */

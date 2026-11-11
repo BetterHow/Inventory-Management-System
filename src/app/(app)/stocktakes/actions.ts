@@ -76,7 +76,8 @@ export async function saveCounts(id: number, fd: FormData) {
     });
   });
   revalidatePath("/stocktakes");
-  return done(`/stocktakes/${id}`, finish ? "盤點完成，已調整庫存" : "已暫存");
+  const st = await prisma.stocktake.findUnique({ where: { id }, select: { number: true } });
+  return done(`/stocktakes/${id}`, finish ? "盤點完成，已調整庫存" : "已暫存盤點", st?.number);
 }
 
 export async function deleteStocktake(id: number) {
