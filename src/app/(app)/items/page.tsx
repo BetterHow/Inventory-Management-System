@@ -25,7 +25,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: SP }) 
         ...(cat ? { categoryId: cat } : {}),
         AND: [visible, dept === undefined ? {} : dept === 0 ? { ownerWarehouseId: null } : { OR: [{ ownerWarehouseId: dept }, { ownerWarehouseId: null }] }],
         ...(q
-          ? { OR: ["code", "name", "nhiCode", "barcode"].map((f) => ({ [f]: { contains: q, mode: "insensitive" as const } })) }
+          ? { OR: ["code", "name", "nhiCode", "barcode", "keywords"].map((f) => ({ [f]: { contains: q, mode: "insensitive" as const } })) }
           : {}),
       },
       include: { category: true, defaultSupplier: true },
@@ -42,7 +42,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: SP }) 
       </PageHeader>
       <Flash sp={sp} />
       <AutoForm className="mb-4 flex flex-wrap items-end gap-2">
-        <input name="q" defaultValue={q} placeholder="搜尋料號、品名、健保碼、條碼" className="input max-w-xs" />
+        <input name="q" defaultValue={q} placeholder="搜尋料號、品名、健保碼、條碼、關鍵字" className="input max-w-xs" />
         <select name="cat" defaultValue={sp.cat ?? ""} className="input max-w-[10rem]">
           <option value="">全部類別</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -71,7 +71,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: SP }) 
               {items.map((i) => (
                 <tr key={i.id}>
                   <td><Link href={`/items/${i.id}`} className="btn-link">{i.code}</Link></td>
-                  <td>{i.name}{i.spec && <span className="text-slate-400"> {i.spec}</span>}</td>
+                  <td>{i.name}{i.spec && <span className="text-slate-400"> {i.spec}</span>}{i.keywords && <div className="text-[11px] text-slate-400">{i.keywords}</div>}</td>
                   <td>{i.category?.name}</td>
                   <td>{i.unit}</td>
                   <td>{i.nhiCode}</td>

@@ -7,7 +7,7 @@ import { attempt, done } from "@/lib/action";
 import { changes } from "@/lib/audit";
 import { writableWarehouses } from "@/lib/pickers";
 
-const ITEM_LABELS = { code: "料號", name: "品名", nhiCode: "健保碼", barcode: "條碼", spec: "規格", unit: "單位", categoryId: "類別", defaultSupplierId: "預設供應商", refPrice: "參考單價", salePrice: "健保價／售價", priceSource: "價格來源", trackBatch: "管批號", ownerWarehouseId: "所屬部門", note: "備註", active: "啟用" };
+const ITEM_LABELS = { code: "料號", name: "品名", nhiCode: "健保碼", barcode: "條碼", keywords: "搜尋關鍵字", spec: "規格", unit: "單位", categoryId: "類別", defaultSupplierId: "預設供應商", refPrice: "參考單價", salePrice: "健保價／售價", priceSource: "價格來源", trackBatch: "管批號", ownerWarehouseId: "所屬部門", note: "備註", active: "啟用" };
 import { UserError, bool, optInt, optNum, optStr, str } from "@/lib/form";
 import { setItemPrice } from "@/lib/prices";
 import { num } from "@/lib/format";
@@ -20,6 +20,11 @@ async function savePrice(tx: Prisma.TransactionClient, itemId: number, fd: FormD
   await setItemPrice(tx, itemId, price, it.priceSource);
 }
 
+/** "BET, beta、NEO" → "BET BETA NEO": split on spaces/commas, upper-case, no repeats. */
+function normalizeKeywords(s: string) {
+  return [...new Set(s.split(/[\s,，、;；\/]+/).map((w) => w.trim().toUpperCase()).filter(Boolean))].join(" ");
+}
+
 function readItem(fd: FormData) {
   const code = str(fd, "code");
   const name = str(fd, "name");
@@ -29,6 +34,7 @@ function readItem(fd: FormData) {
     name,
     nhiCode: optStr(fd, "nhiCode"),
     barcode: optStr(fd, "barcode"),
+    keywords: normalizeKeywords(str(fd, "keywords")),
     spec: optStr(fd, "spec"),
     unit: str(fd, "unit") || "個",
     categoryId: optInt(fd, "categoryId"),

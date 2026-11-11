@@ -149,7 +149,7 @@ export function HisImport({ warehouses, defaultWarehouseId, today }: { warehouse
                         <select value={r.itemId ?? ""} onChange={(e) => setEdits({ ...edits, [r.code]: { ...edits[r.code], itemId: e.target.value ? Number(e.target.value) : null } })}
                           className="input min-w-[12rem] py-1 text-sm">
                           <option value="">（不扣庫）</option>
-                          {preview.items.map((i) => <option key={i.id} value={i.id}>{i.code} {i.name}</option>)}
+                          {preview.items.map((i) => <option key={i.id} value={i.id}>{i.code} {i.name}{i.keywords ? `（${i.keywords}）` : ""}</option>)}
                         </select>
                         {r.matchedBy && r.matchedBy !== "map" && !edits[r.code]?.itemId && <div className="mt-0.5 text-[11px] text-slate-400">依{r.matchedBy === "nhi" ? "健保碼" : r.matchedBy === "code" ? "料號" : "條碼"}自動對應</div>}
                       </td>

@@ -13,6 +13,7 @@ export async function pickItems(): Promise<PickItem[]> {
     unit: i.unit,
     barcode: i.barcode,
     nhiCode: i.nhiCode,
+    keywords: i.keywords,
     refPrice: num(i.refPrice),
     trackBatch: i.trackBatch,
   }));
