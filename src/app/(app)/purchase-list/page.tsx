@@ -6,7 +6,8 @@ import { fmtDateTime, fmtQty, num } from "@/lib/format";
 import { activeWarehouses, pickItems, itemsByWarehouse } from "@/lib/pickers";
 import { getUnit } from "@/lib/auth";
 import { ItemPicker } from "@/components/ItemPicker";
-import { addEntry, bulkAction, deleteEntry } from "./actions";
+import { addEntry, addSuggestions, bulkAction, deleteEntry } from "./actions";
+import { reorderSuggestions } from "@/lib/reorder";
 
 export default async function PurchaseListPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
@@ -20,6 +21,7 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
     pickItems(),
     itemsByWarehouse(),
   ]);
+  const suggestions = await reorderSuggestions(unit ? [unit] : warehouses.map((w) => w.id));
   const itemMap = new Map(items.map((i) => [i.id, i]));
   const whMap = new Map(warehouses.map((w) => [w.id, w.name]));
 
@@ -31,6 +33,40 @@ export default async function PurchaseListPage({ searchParams }: { searchParams:
         {unit && <>目前只顯示「{whMap.get(unit)}」的項目，要看全部請在左上角切換成「全部單位」。</>}
       </p>
       <Flash sp={sp} />
+
+      {suggestions.length > 0 && (
+        <form action={addSuggestions} className="card p-0">
+          <details open={entries.length === 0}>
+            <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-5 py-3.5">
+              <span className="font-semibold text-slate-900">補貨建議 <span className="badge ml-1 bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200">{suggestions.length} 項</span></span>
+              <span className="text-xs text-slate-500">庫存不到 1 個月用量的品項，建議補到 3 個月（已扣掉清單上和已下單未到貨的數量）</span>
+            </summary>
+            <div className="overflow-x-auto border-t border-slate-100">
+              <table className="table">
+                <thead><tr><th></th><th>品項</th>{!unit && <th>庫別</th>}<th className="num">庫存</th><th className="num">每月用量</th><th className="num">已在途</th><th className="num">建議數量</th><th>預設供應商</th></tr></thead>
+                <tbody>
+                  {suggestions.map((s) => {
+                    const k = `${s.warehouseId}:${s.itemId}`;
+                    return (
+                      <tr key={k}>
+                        <td className="w-8"><input type="checkbox" name="s" value={k} defaultChecked /></td>
+                        <td><Link href={`/stock/${s.itemId}?warehouse=${s.warehouseId}`} className="font-medium text-slate-800 hover:text-teal-700">{s.name}</Link> <span className="text-xs text-slate-400">{s.code}</span></td>
+                        {!unit && <td>{whMap.get(s.warehouseId)}</td>}
+                        <td className={`num ${s.stock < 0 ? "font-semibold text-rose-600" : ""}`}>{fmtQty(s.stock)} {s.unit}</td>
+                        <td className="num">{fmtQty(s.monthlyUsage)}</td>
+                        <td className="num text-slate-500">{s.onOrder ? fmtQty(s.onOrder) : ""}</td>
+                        <td className="num"><input name={`q:${k}`} type="number" step="0.01" min="0" defaultValue={s.suggest} className="input ml-auto w-24 py-1 text-right" /></td>
+                        <td>{suppliers.find((x) => x.id === s.supplierId)?.name ?? <span className="text-xs text-slate-400">未設定</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t border-slate-100 p-3"><button className="btn">勾選的加入待採購清單</button></div>
+          </details>
+        </form>
+      )}
 
       <form action={addEntry} className="card grid grid-cols-2 items-end gap-3 sm:grid-cols-6">
         <Field label="品項（掃碼或輸入）" className="col-span-2">

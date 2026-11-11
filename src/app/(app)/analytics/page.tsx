@@ -2,13 +2,15 @@ import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, Coins, Gift, PackagePlus, Percent, TrendingDown, AlertTriangle, type LucideIcon } from "lucide-react";
 import { PageHeader, Pills, WarehousePills, withParams, Field, Empty } from "@/components/ui";
 import { AutoForm } from "@/components/AutoForm";
-import { LineChart, BarChart, RankBars } from "@/components/Charts";
+import { LineChart, BarChart, RankBars, ShareBar } from "@/components/Charts";
 import { analytics, resolvePeriod, PERIODS } from "@/lib/analytics";
+import { ItemsTab, StockTab } from "./tabs";
 import { getUnit, pickWarehouse } from "@/lib/auth";
 import { activeWarehouses } from "@/lib/pickers";
 import { fmtMoney, fmtQty } from "@/lib/format";
 
 const VIZ = { cost: "var(--viz-1)", received: "var(--viz-2)", sale: "var(--viz-3)" };
+const TYPE_COLOR: Record<string, string> = { NHI: "var(--viz-1)", SELF: "var(--viz-4)", FREE: "var(--viz-5)", MANUAL: "var(--viz-3)" };
 const pct = (a: number, b: number) => (b ? (a / b) * 100 : null);
 
 function Kpi({ label, value, prev, icon: Icon, hint, goodWhenUp = true }: {
@@ -42,6 +44,43 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const [unit, warehouses] = await Promise.all([getUnit(), activeWarehouses()]);
   const wid = pickWarehouse(sp.warehouse, unit);
   const { cur, prev } = resolvePeriod(sp);
+  const tab = sp.tab === "items" || sp.tab === "stock" ? sp.tab : "overview";
+  const whName = wid ? warehouses.find((w) => w.id === wid)?.name : "全部單位";
+  const tabs = (
+    <div className="flex gap-1 border-b border-slate-200">
+      {([["overview", "金額總覽"], ["items", "品項耗用分析"], ["stock", "庫存健康度"]] as const).map(([k, l]) => (
+        <Link key={k} href={withParams("/analytics", sp, { tab: k === "overview" ? undefined : k })}
+          className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${tab === k ? "border-teal-600 text-teal-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>{l}</Link>
+      ))}
+    </div>
+  );
+  const filters = (
+    <div className="space-y-2">
+      <WarehousePills path="/analytics" sp={sp} warehouses={warehouses} current={wid} mine={unit} />
+      {tab !== "stock" && (
+        <div className="flex flex-wrap items-end gap-3">
+          <Pills items={PERIODS.map(([k, l]) => ({ href: withParams("/analytics", { warehouse: sp.warehouse, loss: sp.loss, tab: sp.tab }, { period: k }), label: l, active: cur.key === k }))} />
+          <AutoForm className="flex flex-wrap items-end gap-2" clearHref={cur.key === "custom" ? withParams("/analytics", { warehouse: sp.warehouse, loss: sp.loss, tab: sp.tab }, {}) : undefined}>
+            {sp.warehouse && <input type="hidden" name="warehouse" value={sp.warehouse} />}
+            {sp.loss && <input type="hidden" name="loss" value={sp.loss} />}
+            {sp.tab && <input type="hidden" name="tab" value={sp.tab} />}
+            <Field label="自訂期間" className="w-40"><input type="date" name="from" defaultValue={cur.key === "custom" ? cur.from : ""} className="input" /></Field>
+            <Field label="到" className="w-40"><input type="date" name="to" defaultValue={cur.key === "custom" ? cur.to : ""} className="input" /></Field>
+          </AutoForm>
+        </div>
+      )}
+    </div>
+  );
+  if (tab !== "overview") {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="統計分析" description={<>{tab === "stock" ? "目前庫存" : cur.label}・{whName}</>} />
+        {tabs}
+        {filters}
+        {tab === "items" ? <ItemsTab cur={cur} prev={prev} wid={wid} sp={sp} /> : <StockTab wid={wid} />}
+      </div>
+    );
+  }
   const a = await analytics(cur, prev, wid);
   const { totals: t, prevTotals: p } = a;
   const deduct = sp.loss === "deduct";
@@ -49,24 +88,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const shownPrev = deduct ? p.net : p.margin;
   const marginRate = pct(shown, t.sale);
   const unpricedCost = a.unpriced.reduce((s, r) => s + r.cost, 0);
-  const whName = wid ? warehouses.find((w) => w.id === wid)?.name : "全部單位";
   const months = a.months;
 
   return (
     <div className="space-y-6">
       <PageHeader title="統計分析" description={<>{cur.label}・{whName}</>} />
 
+      {tabs}
       <div className="space-y-2">
-        <WarehousePills path="/analytics" sp={sp} warehouses={warehouses} current={wid} mine={unit} />
-        <div className="flex flex-wrap items-end gap-3">
-          <Pills items={PERIODS.map(([k, l]) => ({ href: withParams("/analytics", { warehouse: sp.warehouse, loss: sp.loss }, { period: k }), label: l, active: cur.key === k }))} />
-          <AutoForm className="flex flex-wrap items-end gap-2" clearHref={cur.key === "custom" ? withParams("/analytics", { warehouse: sp.warehouse, loss: sp.loss }, {}) : undefined}>
-            {sp.warehouse && <input type="hidden" name="warehouse" value={sp.warehouse} />}
-            {sp.loss && <input type="hidden" name="loss" value={sp.loss} />}
-            <Field label="自訂期間" className="w-40"><input type="date" name="from" defaultValue={cur.key === "custom" ? cur.from : ""} className="input" /></Field>
-            <Field label="到" className="w-40"><input type="date" name="to" defaultValue={cur.key === "custom" ? cur.to : ""} className="input" /></Field>
-          </AutoForm>
-        </div>
+        {filters}
         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
           <span>贈送／損耗的成本：</span>
           <Pills items={[
@@ -78,7 +108,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Kpi label="耗用成本" value={t.cost} prev={p.cost} icon={TrendingDown} goodWhenUp={false} />
-        <Kpi label="健保價／售價金額" value={t.sale} prev={p.sale} icon={Coins} />
+        <Kpi label="收入（售價／HIS 實收）" value={t.sale} prev={p.sale} icon={Coins} />
         <Kpi label={deduct ? "淨價差（已扣贈送／損耗）" : "價差（售價 − 成本）"} value={shown} prev={shownPrev} icon={Percent}
           hint={<>
             {marginRate !== null && <span className="font-medium text-slate-700">毛利率 {marginRate.toFixed(1)}%</span>}
@@ -96,6 +126,33 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             到下方清單點品項就能補上。
           </div>
         </div>
+      )}
+
+      {a.types.some((x) => x.key !== "MANUAL") && (
+        <section className="card space-y-4">
+          <div>
+            <h2 className="font-semibold text-slate-900">價別分布</h2>
+            <p className="text-xs text-slate-500">HIS 匯入的耗用依單價自動歸類：0 元＝贈送、等於健保價＝健保、其他＝自費（含優惠）。手動登記的耗用另列。</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div><div className="mb-2 text-xs font-medium text-slate-500">收入</div>
+              <ShareBar parts={a.types.map((x) => ({ label: x.name, value: x.sale, color: TYPE_COLOR[x.key] ?? "var(--viz-5)" }))} /></div>
+            <div><div className="mb-2 text-xs font-medium text-slate-500">耗用成本</div>
+              <ShareBar parts={a.types.map((x) => ({ label: x.name, value: x.cost, color: TYPE_COLOR[x.key] ?? "var(--viz-5)" }))} /></div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead><tr><th>價別</th><th className="num">數量</th><th className="num">收入</th><th className="num">成本</th><th className="num">毛利</th><th className="num">毛利率</th></tr></thead>
+              <tbody>
+                {a.types.map((x) => (
+                  <tr key={x.key}><td>{x.name}</td><td className="num">{fmtQty(x.qty)}</td><td className="num">{fmtMoney(Math.round(x.sale))}</td><td className="num">{fmtMoney(Math.round(x.cost))}</td>
+                    <td className={`num ${x.margin < 0 ? "text-rose-600" : ""}`}>{fmtMoney(Math.round(x.margin))}</td>
+                    <td className="num">{x.sale ? `${((x.margin / x.sale) * 100).toFixed(1)}%` : "—"}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       <div className="grid gap-4 xl:grid-cols-5">

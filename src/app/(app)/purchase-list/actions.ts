@@ -91,3 +91,25 @@ export async function deleteEntry(id: number) {
   revalidatePath("/purchase-list");
   return done("/purchase-list", "已刪除");
 }
+
+/** Adds the ticked 補貨建議 to the list with the quantities shown (editable). */
+export async function addSuggestions(fd: FormData) {
+  const user = await requireUser();
+  const picked = fd.getAll("s").map(String);
+  let n = 0;
+  await attempt("/purchase-list", async () => {
+    if (!picked.length) throw new UserError("請先勾選要加入的品項");
+    const ids = [...new Set(picked.map((k) => Number(k.split(":")[1])))];
+    const items = new Map((await prisma.item.findMany({ where: { id: { in: ids } } })).map((i) => [i.id, i]));
+    const data = picked.flatMap((k) => {
+      const [wid, itemId] = k.split(":").map(Number);
+      const qty = Number(fd.get(`q:${k}`));
+      if (!items.has(itemId) || !(qty > 0)) return [];
+      return [{ itemId, warehouseId: wid, supplierId: items.get(itemId)!.defaultSupplierId, qty, note: "補貨建議", createdById: user.id }];
+    });
+    await prisma.purchaseListEntry.createMany({ data });
+    n = data.length;
+  });
+  revalidatePath("/purchase-list");
+  return done("/purchase-list", `已加入 ${n} 項補貨建議`);
+}
