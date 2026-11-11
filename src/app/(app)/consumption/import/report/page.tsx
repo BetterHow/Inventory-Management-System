@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { PageHeader, Empty, WarehousePills } from "@/components/ui";
-import { requireUser, pickWarehouse, getUnit } from "@/lib/auth";
+import { pickWarehouse, getUnit, getAccess } from "@/lib/auth";
 import { activeWarehouses } from "@/lib/pickers";
 import { fmtMoney, fmtQty, num } from "@/lib/format";
 import { todayTaipei } from "@/lib/logic";
@@ -26,19 +26,20 @@ const money = (n: number) => fmtMoney(Math.round(n));
 
 export default async function HisReportPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  await requireUser();
-  const [warehouses, unit] = await Promise.all([activeWarehouses(), getUnit()]);
-  const wid = pickWarehouse(sp.warehouse, unit);
+  const [warehouses, unit, access] = await Promise.all([activeWarehouses(), getUnit(), getAccess()]);
+  const wid = await pickWarehouse(sp.warehouse, unit);
+  // 「全部庫別」 still leaves out the departments this person may not see.
+  const whereWh = wid ? { warehouseId: wid } : access.hidden.length ? { warehouseId: { notIn: access.hidden } } : {};
   const today = todayTaipei();
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from ?? "") ? sp.from : today.slice(0, 8) + "01";
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? "") ? sp.to : today;
 
   const [lines, imports] = await Promise.all([
     prisma.hisImportLine.findMany({
-      where: { import: { dateTo: { gte: new Date(from + "T00:00:00Z"), lte: new Date(to + "T00:00:00Z") }, ...(wid ? { warehouseId: wid } : {}) } },
+      where: { import: { dateTo: { gte: new Date(from + "T00:00:00Z"), lte: new Date(to + "T00:00:00Z") }, ...whereWh } },
     }),
     prisma.hisImport.count({
-      where: { dateTo: { gte: new Date(from + "T00:00:00Z"), lte: new Date(to + "T00:00:00Z") }, ...(wid ? { warehouseId: wid } : {}) },
+      where: { dateTo: { gte: new Date(from + "T00:00:00Z"), lte: new Date(to + "T00:00:00Z") }, ...whereWh },
     }),
   ]);
   const itemIds = [...new Set(lines.map((l) => l.itemId).filter((x): x is number => x != null))];
