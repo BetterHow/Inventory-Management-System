@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { prisma } from "@/lib/db";
 import { PageHeader, LinkButton, Empty, WarehousePills, withParams } from "@/components/ui";
 import { getAccess, getUnit, invoiceVisible, pickWarehouse } from "@/lib/auth";

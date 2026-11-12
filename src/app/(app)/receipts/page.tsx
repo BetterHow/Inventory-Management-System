@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { Prisma, ReceiptStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser, pickWarehouse, getUnit, getAccess } from "@/lib/auth";

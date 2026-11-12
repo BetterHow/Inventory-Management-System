@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { prisma } from "@/lib/db";
 import { SafetyBadge, ExpiryBadge } from "@/components/ui";
 import { stockOverview } from "@/lib/overview";

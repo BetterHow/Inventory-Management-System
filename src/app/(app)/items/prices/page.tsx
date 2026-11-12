@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import { Flash } from "@/components/Flash";
