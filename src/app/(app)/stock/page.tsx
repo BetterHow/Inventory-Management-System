@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { PageHeader, SafetyBadge, ExpiryBadge, Empty } from "@/components/ui";
 import { Flash } from "@/components/Flash";
 import { stockOverview } from "@/lib/overview";

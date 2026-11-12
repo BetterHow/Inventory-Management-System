@@ -6,7 +6,7 @@ import { getSettings, saveSettings, splitLines } from "@/lib/settings";
 import { bool, intVal, str } from "@/lib/form";
 import { PageHeader, Field } from "@/components/ui";
 import { Flash } from "@/components/Flash";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { mailReady, sendDigest } from "@/lib/digest";
 
 async function save(fd: FormData) {

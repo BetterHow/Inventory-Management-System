@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SAFETY_LABEL, type SafetyStatus, type ExpiryStatus } from "@/lib/logic";
 
 export function PageHeader({ title, description, children }: { title: string; description?: React.ReactNode; children?: React.ReactNode }) {

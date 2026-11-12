@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { getAccess, getUnit, pickWarehouse } from "@/lib/auth";
 import { AutoForm } from "@/components/AutoForm";
 import { prisma } from "@/lib/db";

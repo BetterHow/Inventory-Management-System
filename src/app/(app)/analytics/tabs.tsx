@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, Clock, Hourglass, PackageX, RefreshCw, Wallet, type LucideIcon } from "lucide-react";
 import { Empty, Pills, withParams } from "@/components/ui";
 import { ShareBar } from "@/components/Charts";

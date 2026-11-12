@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { PageHeader, Empty, Field, withParams } from "@/components/ui";

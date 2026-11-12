@@ -12,7 +12,8 @@ export const getCurrentUser = cache(async () => {
   const store = await cookies();
   const s = await verifySession(store.get(SESSION_COOKIE)?.value);
   if (!s) return null;
-  const user = await prisma.user.findUnique({ where: { id: s.uid } });
+  // Department restrictions come along in the same query: every page needs them.
+  const user = await prisma.user.findUnique({ where: { id: s.uid }, include: { access: true } });
   if (!user || !user.active) return null;
   return user;
 });
@@ -35,7 +36,7 @@ export async function requireAdmin() {
  */
 export const getAccess = cache(async () => {
   const user = await requireUser();
-  const rows = user.role === "ADMIN" ? [] : await prisma.userWarehouseAccess.findMany({ where: { userId: user.id } });
+  const rows = user.role === "ADMIN" ? [] : user.access;
   const hidden = rows.filter((r) => r.level === "NONE").map((r) => r.warehouseId);
   const readOnly = new Set(rows.filter((r) => r.level === "READ").map((r) => r.warehouseId));
   const none = new Set(hidden);
@@ -81,19 +82,20 @@ export async function assertRead(...warehouseIds: number[]) {
  * Falls back to their 負責庫別. undefined = all units (never for someone with hidden warehouses).
  */
 export const getUnit = cache(async (): Promise<number | undefined> => {
-  const [user, access] = await Promise.all([requireUser(), getAccess()]);
+  const [user, access, active] = await Promise.all([requireUser(), getAccess(), activeWarehouseIds()]);
   const v = (await cookies()).get(UNIT_COOKIE)?.value;
   if (v === "all" && !access.limited) return undefined;
-  const wanted = [Number(v) || 0, user.defaultWarehouseId ?? 0].filter((id) => id > 0 && access.canRead(id));
-  if (wanted.length) {
-    const found = await prisma.warehouse.findMany({ where: { id: { in: wanted }, active: true }, select: { id: true } });
-    const hit = wanted.find((id) => found.some((f) => f.id === id));
-    if (hit) return hit;
-  }
+  const hit = [Number(v) || 0, user.defaultWarehouseId ?? 0].find((id) => id > 0 && access.canRead(id) && active.includes(id));
+  if (hit) return hit;
   if (!access.limited) return undefined;
-  const first = await prisma.warehouse.findFirst({ where: { active: true, id: { notIn: access.hidden } }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }], select: { id: true } });
-  return first?.id ?? -1; // -1 matches nothing: every warehouse is hidden from this person
+  return active.find((id) => access.canRead(id)) ?? -1; // -1 matches nothing: every warehouse is hidden from this person
 });
+
+/** Active warehouses in display order. Once per request. */
+export const activeWarehouseList = cache(() =>
+  prisma.warehouse.findMany({ where: { active: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+);
+const activeWarehouseIds = cache(async () => (await activeWarehouseList()).map((w) => w.id));
 
 /** Which warehouse a list page shows: "all" = every warehouse, a number = that one, nothing chosen = 目前單位. */
 export async function pickWarehouse(param: string | undefined, unit: number | undefined): Promise<number | undefined> {

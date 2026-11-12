@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { ArrowDownRight, ArrowUpRight, Coins, Gift, PackagePlus, Percent, TrendingDown, AlertTriangle, type LucideIcon } from "lucide-react";
 import { PageHeader, Pills, WarehousePills, withParams, Field, Empty } from "@/components/ui";
 import { AutoForm } from "@/components/AutoForm";

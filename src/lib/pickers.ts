@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "./db";
 import { num, fmtDate } from "./format";
-import { getAccess } from "./auth";
+import { getAccess, activeWarehouseList } from "./auth";
 import type { PickItem, PickBatch } from "@/components/LineEditor";
 
 export async function pickItems(): Promise<PickItem[]> {
@@ -43,10 +43,7 @@ export async function pickStock(): Promise<{ batches: PickBatch[]; stock: Record
 
 /** Active warehouses this person may see. */
 export async function activeWarehouses() {
-  const [list, access] = await Promise.all([
-    prisma.warehouse.findMany({ where: { active: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    getAccess(),
-  ]);
+  const [list, access] = await Promise.all([activeWarehouseList(), getAccess()]);
   return list.filter((w) => access.canRead(w.id));
 }
 
